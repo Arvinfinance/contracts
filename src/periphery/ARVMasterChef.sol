@@ -22,7 +22,8 @@ contract ARVMasterChef is Ownable {
         uint256 rewardDebt;
     }
     struct LockDetail {
-        uint256 amount;
+        uint256 lockAmount;
+        uint256 unlockAmount;
         uint256 unlockTimestamp;
     }
 
@@ -111,7 +112,7 @@ contract ARVMasterChef is Ownable {
             }
         }
         if (_amount > 0) {
-            userLock[to].push(LockDetail({amount: _amount, unlockTimestamp: block.timestamp + 21 days}));
+            userLock[to].push(LockDetail({lockAmount: _amount, unlockAmount: 0, unlockTimestamp: block.timestamp + 21 days}));
             vin.transferFrom(address(to), address(this), _amount);
             user.amount = user.amount.add(_amount);
             emit Deposit(msg.sender, _amount);
@@ -138,10 +139,12 @@ contract ARVMasterChef is Ownable {
             for (i = unlockIndex; i < details.length && unlockAmountLeft > 0; i++) {
                 LockDetail storage detail = userLock[to][i];
                 if (detail.unlockTimestamp <= epoch) {
-                    if (detail.amount <= unlockAmountLeft) {
-                        unlockAmountLeft -= detail.amount;
+                    uint256 unlockableAmount = detail.lockAmount - detail.unlockAmount;
+                    if (unlockableAmount <= unlockAmountLeft) {
+                        unlockAmountLeft -= unlockableAmount;
+                        detail.unlockAmount = detail.lockAmount;
                     } else {
-                        detail.amount -= unlockAmountLeft;
+                        detail.unlockAmount += unlockAmountLeft;
                         unlockAmountLeft = 0;
                         break;
                     }
@@ -188,7 +191,7 @@ contract ARVMasterChef is Ownable {
         uint256 unlockIndex = userUnlockIndex[user];
         for (uint256 i = unlockIndex; i < details.length; i++) {
             if (details[i].unlockTimestamp <= epoch) {
-                amount += details[i].amount;
+                amount += details[i].lockAmount - details[i].unlockAmount;
             } else {
                 break;
             }

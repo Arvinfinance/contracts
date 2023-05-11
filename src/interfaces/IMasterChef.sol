@@ -10,5 +10,5 @@ interface IMasterChef {
 
     function totalStake(uint256 _pid) external returns (uint256 stakeAmount);
 
-    function userRewardInfo(address user) external returns (uint256 pendingReward, uint256 vestingReward, uint256 claimTime);
+    function userPendingReward(address user) external returns (uint256 pendingReward);
 }

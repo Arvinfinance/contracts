@@ -22,10 +22,10 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 rewardDebt;
     }
     // Info of each user.
-    struct UserRewardInfo {
-        uint256 pendingReward;
+    struct VestingInfo {
         uint256 vestingReward;
         uint256 claimTime;
+        bool isClaimed;
     }
 
     // Info of each pool.
@@ -38,7 +38,8 @@ contract MasterChef is Ownable, IMasterChef {
         bool isDynamicReward;
     }
     struct LockDetail {
-        uint256 amount;
+        uint256 lockAmount;
+        uint256 unlockAmount;
         uint256 unlockTimestamp;
     }
 
@@ -55,7 +56,8 @@ contract MasterChef is Ownable, IMasterChef {
     mapping(address => uint256) public cauldronPoolInfo;
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
-    mapping(address => UserRewardInfo) public userRewardInfo;
+    mapping(address => VestingInfo[]) public userVestingInfo;
+    mapping(address => uint256) public userPendingReward;
 
     uint256 public constant VIN_POOL = 1;
     uint256 public constant ARV_POOL = 2;
@@ -186,7 +188,7 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 unlockIndex = userUnlockIndex[user];
         for (uint256 i = unlockIndex; i < details.length; i++) {
             if (details[i].unlockTimestamp <= epoch) {
-                amount += details[i].amount;
+                amount += details[i].lockAmount - details[i].unlockAmount;
             } else {
                 break;
             }
@@ -247,7 +249,7 @@ contract MasterChef is Ownable, IMasterChef {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             if (pending > 0) {
                 if (!pool.isDynamicReward) {
-                    userRewardInfo[to].pendingReward += pending;
+                    userPendingReward[to] += pending;
                 } else {
                     IStrictERC20(pool.rewardToken).transfer(to, pending);
                 }
@@ -263,7 +265,7 @@ contract MasterChef is Ownable, IMasterChef {
                 user.amount = user.amount.add(_amount);
                 totalStake[_pid] += _amount;
                 if (pool.stakeToken == address(vin)) {
-                    userLock[to].push(LockDetail({amount: _amount, unlockTimestamp: block.timestamp + 21 days}));
+                    userLock[to].push(LockDetail({lockAmount: _amount, unlockAmount: 0, unlockTimestamp: block.timestamp + 21 days}));
                 }
                 emit Deposit(msg.sender, _pid, _amount);
             }
@@ -301,7 +303,7 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
         if (pending > 0) {
             if (!pool.isDynamicReward) {
-                userRewardInfo[to].pendingReward += pending;
+                userPendingReward[to] += pending;
             } else {
                 IStrictERC20(pool.rewardToken).transfer(to, pending);
             }
@@ -322,10 +324,12 @@ contract MasterChef is Ownable, IMasterChef {
                     for (i = unlockIndex; i < details.length && unlockAmountLeft > 0; i++) {
                         LockDetail storage detail = userLock[to][i];
                         if (detail.unlockTimestamp <= epoch) {
-                            if (detail.amount <= unlockAmountLeft) {
-                                unlockAmountLeft -= detail.amount;
+                            uint256 unlockableAmount = detail.lockAmount - detail.unlockAmount;
+                            if (unlockableAmount <= unlockAmountLeft) {
+                                unlockAmountLeft -= unlockableAmount;
+                                detail.unlockAmount = detail.lockAmount;
                             } else {
-                                detail.amount -= unlockAmountLeft;
+                                detail.unlockAmount += unlockAmountLeft;
                                 unlockAmountLeft = 0;
                                 break;
                             }
@@ -351,7 +355,7 @@ contract MasterChef is Ownable, IMasterChef {
         user.rewardDebt = user.amount.mul(pool.rewardPerShare).div(1e20);
         if (pending > 0) {
             if (!pool.isDynamicReward) {
-                userRewardInfo[to].pendingReward += pending;
+                userPendingReward[to] += pending;
             } else {
                 IStrictERC20(pool.rewardToken).transfer(to, pending);
             }
@@ -364,18 +368,23 @@ contract MasterChef is Ownable, IMasterChef {
                 claimPending(i);
             }
         }
-        UserRewardInfo storage rewardInfo = userRewardInfo[msg.sender];
-        rewardInfo.vestingReward = rewardInfo.pendingReward;
-        rewardInfo.pendingReward = 0;
-        rewardInfo.claimTime = block.timestamp + 21 days;
+        userVestingInfo[msg.sender].push(
+            VestingInfo({vestingReward: userPendingReward[msg.sender], claimTime: block.timestamp + 21 days, isClaimed: false})
+        );
+        userPendingReward[msg.sender] = 0;
     }
 
     function claimVestingReward() public {
-        UserRewardInfo storage rewardInfo = userRewardInfo[msg.sender];
-        require(rewardInfo.claimTime <= block.timestamp, "still vesting");
-        uint256 reward = rewardInfo.vestingReward;
-        rewardInfo.vestingReward = 0;
-        rewardInfo.claimTime = 0;
+        VestingInfo[] storage details = userVestingInfo[msg.sender];
+        uint256 reward = 0;
+        for (uint256 i = 0; i < details.length; i++) {
+            if (!details[i].isClaimed && details[i].claimTime <= block.timestamp) {
+                details[i].isClaimed = true;
+                reward += details[i].vestingReward;
+            } else {
+                break;
+            }
+        }
         vin.transfer(msg.sender, reward);
     }
 
