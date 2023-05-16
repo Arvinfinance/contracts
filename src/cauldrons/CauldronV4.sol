@@ -326,7 +326,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         // As long as there are tokens on this contract you can 'mint'... this enables limiting borrows
         share = bentoBox.toShare(magicInternetMoney, amount, false);
         bentoBox.transfer(magicInternetMoney, address(this), to, share);
-        IMasterChef(distributeTo).deposit(msg.sender, 0, 0);
+        IMasterChef(distributeTo).deposit(msg.sender);
         totalBorrow = _totalBorrow;
         emit LogBorrow(msg.sender, to, amount.add(feeAmount), part);
     }
@@ -355,7 +355,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     function _repay(address to, bool skim, uint256 part) internal returns (uint256 amount) {
         handleRefund(to);
         userBorrowPart[to] = userBorrowPart[to].sub(part);
-        IMasterChef(distributeTo).withdraw(to, 0, 0);
+        IMasterChef(distributeTo).withdraw(to);
         (totalBorrow, amount) = totalBorrow.sub(part, true);
         userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / 1e20;
         uint256 share = bentoBox.toShare(magicInternetMoney, amount, true);
@@ -624,7 +624,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         }
         require(allBorrowAmount != 0, "Cauldron: all are solvent");
         for (uint256 i = 0; i < users.length; i++) {
-            IMasterChef(distributeTo).withdraw(users[i], 0, 0);
+            IMasterChef(distributeTo).withdraw(users[i]);
         }
         totalBorrow.elastic = totalBorrow.elastic.sub(allBorrowAmount.to128());
         totalBorrow.base = totalBorrow.base.sub(allBorrowPart.to128());

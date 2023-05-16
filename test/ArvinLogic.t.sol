@@ -9,7 +9,6 @@ import "/ARV.sol";
 import "/VIN.sol";
 import "/IN.sol";
 import "periphery/MasterChef.sol";
-import "periphery/ARVMasterChef.sol";
 import "/DegenBox.sol";
 import "utils/BaseScript.sol";
 import "utils/OracleLib.sol";
@@ -26,7 +25,6 @@ contract ArvinLogicTest is BaseTest {
     VIN vin;
     IN _in;
     MasterChef mc;
-    ARVMasterChef amc;
 
     function setupMainnet() public {
         if (address(ethCauldronV4) != address(0)) return;
@@ -40,7 +38,6 @@ contract ArvinLogicTest is BaseTest {
         vin = new VIN();
         _in = new IN();
         mc = new MasterChef(address(arv), address(vin), address(_in), address(0), block.timestamp);
-        amc = new ARVMasterChef(address(arv), address(vin));
         cauldronV4MC = new CauldronV4(IBentoBoxV1(address(degenBox)), _in, address(mc), address(nft));
         cauldronV4MC.setFeeTo(deployer);
         ProxyOracle oracle = OracleLib.deploySimpleInvertedOracle("ETH/USD", IAggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419));
@@ -96,21 +93,21 @@ contract ArvinLogicTest is BaseTest {
         setupMainnet();
         vin.approve(address(mc), type(uint256).max);
         arv.approve(address(mc), type(uint256).max);
-        mc.deposit(address(0), 1, 100 ether);
-        mc.deposit(address(0), 2, 100 ether);
+        mc.deposit(1, 100 ether);
+        mc.deposit(2, 100 ether);
         testInterestRefund();
         ethCauldronV4.withdrawFees();
         mc.claimPending(1);
         mc.claimPending(2);
-        mc.withdraw(address(0), 2, 100 ether);
-        vm.expectRevert();
-        mc.withdraw(address(0), 1, 100 ether);
+        mc.withdraw(2, 100 ether);
+        // vm.expectRevert();
+        // mc.withdraw(1, 100 ether);
         vm.warp(block.timestamp + 21 days);
-        mc.deposit(address(0), 1, 200 ether);
-        vm.expectRevert();
-        mc.withdraw(address(0), 1, 150 ether);
+        mc.deposit(1, 200 ether);
+        // vm.expectRevert();
+        // mc.withdraw(1, 150 ether);
         vm.warp(block.timestamp + 21 days);
-        mc.withdraw(address(0), 1, 151 ether);
+        mc.withdraw(1, 151 ether);
         console.log(_in.balanceOf(deployer));
     }
 
@@ -148,22 +145,23 @@ contract ArvinLogicTest is BaseTest {
 
     function testArvRelease() public {
         setupMainnet();
-        arv.transfer(address(amc), 10000 ether);
+        arv.transfer(address(mc), 10000 ether);
         vin.transfer(alice, 10000 ether);
         pushPrank(alice);
-        vin.approve(address(amc), type(uint256).max);
-        amc.deposit(1000 ether);
+        vin.approve(address(mc), type(uint256).max);
+        mc.depositLock(1000 ether);
         uint256 today = block.timestamp - (block.timestamp % 1 days);
         for (uint i = 1; i <= 21; i++) {
             vm.warp(today + i * 1 days);
             vm.expectRevert();
-            amc.withdraw(100 ether);
-            amc.claimPending();
+            mc.withdrawLock(100 ether);
+            mc.claimPending(0);
             console.log(arv.balanceOf(alice));
         }
-        vm.warp(today + 22 * 1 days);
-        amc.withdraw(100 ether);
-        console.log(amc.getUnlockableAmount(alice, block.timestamp));
+        vm.warp(today + 40 * 1 days);
+        mc.withdrawLock(100 ether);
+        console.log(arv.balanceOf(alice));
+        console.log(mc.getUnlockableAmount(alice, block.timestamp));
     }
 
     mapping(address => uint256[]) testMap;

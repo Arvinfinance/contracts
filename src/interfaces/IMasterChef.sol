@@ -4,11 +4,23 @@ pragma solidity ^0.8.0;
 interface IMasterChef {
     function addRewardToPool(uint256 poolId, uint256 amount) external;
 
-    function withdraw(address to, uint256 _pid, uint256 _amount) external;
+    function deposit(uint256 _pid, uint256 _amount) external;
 
-    function deposit(address to, uint256 _pid, uint256 _amount) external;
+    function deposit(address to) external;
+
+    function depositLock(uint256 _amount) external;
+
+    function withdraw(uint256 _pid, uint256 _amount) external;
+
+    function withdraw(address to) external;
+
+    function withdrawLock(uint256 _amount) external;
 
     function totalStake(uint256 _pid) external returns (uint256 stakeAmount);
 
     function userPendingReward(address user) external returns (uint256 pendingReward);
+
+    function getLockAmount(address user) external view returns (uint256 amount);
+
+    function userInfo(uint256 _pid, address user) external view returns (uint256 amount, uint256 debt);
 }
