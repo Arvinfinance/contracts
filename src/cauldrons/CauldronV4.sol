@@ -131,16 +131,6 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         _;
     }
 
-    // constructor(IBentoBoxV1 bentoBox_, IERC20 magicInternetMoney_) {
-    //     bentoBox = bentoBox_;
-    //     magicInternetMoney = magicInternetMoney_;
-    //     masterContract = this;
-
-    //     blacklistedCallees[address(bentoBox)] = true;
-    //     blacklistedCallees[address(this)] = true;
-    //     blacklistedCallees[BoringOwnable(address(bentoBox)).owner()] = true;
-    // }
-
     // /// @notice The constructor is only used for the initial master contract. Subsequent clones are initialised via `init`.
     constructor(IBentoBoxV1 bentoBox_, IERC20 magicInternetMoney_, address distributeTo_, address _arvinDegenNftAddress) {
         bentoBox = bentoBox_;
@@ -174,6 +164,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
 
         blacklistedCallees[address(bentoBox)] = true;
         blacklistedCallees[address(this)] = true;
+        blacklistedCallees[distributeTo] = true;
         blacklistedCallees[BoringOwnable(address(bentoBox)).owner()] = true;
 
         (, exchangeRate) = oracle.get(oracleData);

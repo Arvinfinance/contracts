@@ -38,11 +38,6 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 rewardPerShare; //multiply 1e20
         bool isDynamicReward;
     }
-    struct LockDetail {
-        uint256 lockAmount;
-        uint256 unlockAmount;
-        uint256 unlockTimestamp;
-    }
 
     uint256 public arvLastRelease;
     uint256 public totalVinLock;
@@ -62,8 +57,10 @@ contract MasterChef is Ownable, IMasterChef {
     mapping(address => VestingInfo[]) public userVestingInfo;
     mapping(address => uint256) public userPendingReward;
 
+    uint256 public constant LOCK_POOL = 0;
     uint256 public constant VIN_POOL = 1;
     uint256 public constant ARV_POOL = 2;
+    uint256 public constant LP_POOL = 3;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
