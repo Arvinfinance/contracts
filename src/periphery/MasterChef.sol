@@ -301,7 +301,7 @@ contract MasterChef is Ownable, IMasterChef {
         require(_pid != 0, "deposit CAKE by staking");
         updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
-        if (pool.isDynamicReward) {
+        if (pool.isDynamicReward || _pid == LP_POOL) {
             to = msg.sender;
         } else {
             require(msg.sender == pool.stakeToken, "only cauldron can deposit non dynamic pool");
@@ -310,14 +310,14 @@ contract MasterChef is Ownable, IMasterChef {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             if (pending > 0) {
-                if (!pool.isDynamicReward) {
+                if (!pool.isDynamicReward && _pid != LP_POOL) {
                     userPendingReward[to] += pending;
                 } else {
                     IStrictERC20(pool.rewardToken).transfer(to, pending);
                 }
             }
         }
-        if (!pool.isDynamicReward) {
+        if (!pool.isDynamicReward && _pid != LP_POOL) {
             uint256 newAmount = ICauldronV4(pool.stakeToken).userBorrowPart(to);
             emit Deposit(msg.sender, _pid, newAmount - user.amount);
             user.amount = newAmount;
@@ -369,7 +369,7 @@ contract MasterChef is Ownable, IMasterChef {
         require(_pid != 0, "withdraw CAKE by unstaking");
         updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
-        if (pool.isDynamicReward) {
+        if (pool.isDynamicReward || _pid == LP_POOL) {
             to = msg.sender;
         } else {
             require(msg.sender == pool.stakeToken, "only cauldron can deposit non dynamic pool");
@@ -378,13 +378,13 @@ contract MasterChef is Ownable, IMasterChef {
         require(user.amount >= _amount, "withdraw: not good");
         uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
         if (pending > 0) {
-            if (!pool.isDynamicReward) {
+            if (!pool.isDynamicReward && _pid != LP_POOL) {
                 userPendingReward[to] += pending;
             } else {
                 IStrictERC20(pool.rewardToken).transfer(to, pending);
             }
         }
-        if (!pool.isDynamicReward) {
+        if (!pool.isDynamicReward && _pid != LP_POOL) {
             uint256 oldAmount = ICauldronV4(pool.stakeToken).userBorrowPart(to);
             emit Withdraw(to, _pid, user.amount - oldAmount);
             user.amount = oldAmount;
@@ -442,7 +442,7 @@ contract MasterChef is Ownable, IMasterChef {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             user.rewardDebt = user.amount.mul(pool.rewardPerShare).div(1e20);
             if (pending > 0) {
-                if (!pool.isDynamicReward) {
+                if (!pool.isDynamicReward && _pid != LP_POOL) {
                     userPendingReward[to] += pending;
                 } else {
                     IStrictERC20(pool.rewardToken).transfer(to, pending);

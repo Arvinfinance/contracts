@@ -31,7 +31,9 @@ interface IMasterChef {
 
     function totalStake(uint256 _pid) external returns (uint256 stakeAmount);
 
-    function userPendingReward(address user) external returns (uint256 pendingReward);
+    function pendingReward(uint256 _pid, address _user) external view returns (uint256);
+
+    function userPendingReward(address user) external view returns (uint256 pendingReward);
 
     function userInfo(uint256 _pid, address user) external view returns (uint256 amount, uint256 debt);
 
@@ -54,4 +56,12 @@ interface IMasterChef {
     function getLockInfo(address user) external view returns (LockDetail[] memory locks);
 
     function getUnlockableAmount(address user) external view returns (uint256 amount);
+
+    function vestingPendingReward(bool claim) external;
+
+    function claimVestingReward() external;
+
+    function emergencyWithdraw(uint256 _pid) external;
+
+    function estimateARVCirculatingSupply() public view returns (uint256 circulatingSupply);
 }
