@@ -8,6 +8,13 @@ interface IMasterChef {
         uint256 unlockTimestamp;
     }
 
+    // Info of each user.
+    struct VestingInfo {
+        uint256 vestingReward;
+        uint256 claimTime;
+        bool isClaimed;
+    }
+
     function addRewardToPool(uint256 poolId, uint256 amount) external;
 
     function deposit(uint256 _pid, uint256 _amount) external;
@@ -26,11 +33,9 @@ interface IMasterChef {
 
     function userPendingReward(address user) external returns (uint256 pendingReward);
 
-    function userInfo(uint256 _pid, address user) external view returns (uint256 amount, uint256 debt);
-
     function getLockAmount(address user) external view returns (uint256 amount);
 
     function getLockInfo(address user) external view returns (LockDetail[] memory locks);
 
-    function getUnlockableAmount(address user, uint256 epoch) external view returns (uint256 amount);
+    function getUnlockableAmount(address user) external view returns (uint256 amount);
 }

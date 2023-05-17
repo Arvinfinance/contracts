@@ -161,7 +161,7 @@ contract ArvinLogicTest is BaseTest {
         vm.warp(today + 40 * 1 days);
         mc.withdrawLock(100 ether);
         console.log(arv.balanceOf(alice));
-        console.log(mc.getUnlockableAmount(alice, block.timestamp));
+        console.log(mc.getUnlockableAmount(alice));
     }
 
     mapping(address => uint256[]) testMap;

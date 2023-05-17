@@ -22,12 +22,6 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 amount;
         uint256 rewardDebt;
     }
-    // Info of each user.
-    struct VestingInfo {
-        uint256 vestingReward;
-        uint256 claimTime;
-        bool isClaimed;
-    }
 
     // Info of each pool.
     struct PoolInfo {
@@ -213,11 +207,11 @@ contract MasterChef is Ownable, IMasterChef {
         }
     }
 
-    function getUnlockableAmount(address user, uint256 epoch) public view returns (uint256 amount) {
+    function getUnlockableAmount(address user) public view returns (uint256 amount) {
         LockDetail[] memory details = userLock[user];
         uint256 unlockIndex = userUnlockIndex[user];
         for (uint256 i = unlockIndex; i < details.length; i++) {
-            if (details[i].unlockTimestamp <= epoch) {
+            if (details[i].unlockTimestamp <= block.timestamp) {
                 amount += details[i].lockAmount - details[i].unlockAmount;
             } else {
                 break;
@@ -398,7 +392,7 @@ contract MasterChef is Ownable, IMasterChef {
             if (_amount > 0) {
                 if (pool.stakeToken == address(vin) && unlockVIN) {
                     uint256 epoch = block.timestamp;
-                    require(getUnlockableAmount(to, epoch) >= _amount, "no enough unlockable");
+                    require(getUnlockableAmount(to) >= _amount, "no enough unlockable");
                     uint256 unlockAmountLeft = _amount;
                     uint256 i = 0;
                     uint256 unlockIndex = userUnlockIndex[to];
@@ -485,13 +479,22 @@ contract MasterChef is Ownable, IMasterChef {
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(uint256 _pid) public {
+        require(_pid != 0, "can not emergency withdraw arv release pool");
         PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
-        if (pool.isDynamicReward) {
-            IStrictERC20(pool.stakeToken).transfer(address(msg.sender), user.amount);
-            emit EmergencyWithdraw(msg.sender, _pid, user.amount);
-            user.amount = 0;
-            user.rewardDebt = 0;
+        address operator = msg.sender;
+        UserInfo storage user = userInfo[_pid][operator];
+        IStrictERC20(pool.stakeToken).transfer(operator, user.amount);
+        if (_pid == 1) {
+            uint256 userLockAmount = getLockAmount(operator);
+            totalVinLock -= userLockAmount;
+            delete userLock[operator];
+            delete userUnlockIndex[operator];
         }
+        if (pool.isDynamicReward) {
+            totalStake[_pid] -= user.amount;
+        }
+        emit EmergencyWithdraw(operator, _pid, user.amount);
+        user.amount = 0;
+        user.rewardDebt = 0;
     }
 }
