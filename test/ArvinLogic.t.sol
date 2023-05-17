@@ -57,7 +57,7 @@ contract ArvinLogicTest is BaseTest {
         _in.mint(deployer, 10000000 ether);
         _in.transfer(address(degenBox), 500000 ether);
         _in.approve(address(degenBox), type(uint256).max);
-        mc.add((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), true);
+        mc.add((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), block.timestamp, true);
         degenBox.deposit(_in, address(deployer), address(ethCauldronV4), 500000 ether, 0);
     }
 
@@ -152,10 +152,14 @@ contract ArvinLogicTest is BaseTest {
         mc.depositLock(1000 ether);
         uint256 today = block.timestamp - (block.timestamp % 1 days);
         for (uint i = 1; i <= 21; i++) {
+            console.log("------newday---------");
             vm.warp(today + i * 1 days);
             vm.expectRevert();
             mc.withdrawLock(100 ether);
+            console.log(mc.estimateARVCirculatingSupply());
+            console.log(mc.pendingReward(0, alice));
             mc.claimPending(0);
+            console.log(mc.arvCirculatingSupply());
             console.log(arv.balanceOf(alice));
         }
         vm.warp(today + 40 * 1 days);

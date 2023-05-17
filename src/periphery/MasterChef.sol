@@ -34,6 +34,7 @@ contract MasterChef is Ownable, IMasterChef {
     }
 
     uint256 public arvLastRelease;
+    uint256 public arvCirculatingSupply;
     uint256 public totalVinLock;
     mapping(uint256 => uint256) public totalStake;
     mapping(address => LockDetail[]) public userLock;
@@ -123,7 +124,7 @@ contract MasterChef is Ownable, IMasterChef {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _rewardPerSecond, address _cauldronAddress, bool _withUpdate) public onlyOwner {
+    function add(uint256 _rewardPerSecond, address _cauldronAddress, uint256 startTimestamp, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -132,7 +133,7 @@ contract MasterChef is Ownable, IMasterChef {
             PoolInfo({
                 stakeToken: _cauldronAddress,
                 rewardToken: address(vin),
-                lastRewardTimestamp: block.timestamp,
+                lastRewardTimestamp: startTimestamp,
                 rewardPerSecond: _rewardPerSecond,
                 rewardPerShare: 0,
                 isDynamicReward: false
@@ -164,16 +165,16 @@ contract MasterChef is Ownable, IMasterChef {
                 uint256 rPerSencond = pool.rewardPerSecond;
                 uint256 epoch = block.timestamp;
                 uint256 userLockAmount = getLockAmount(_user);
-                if (block.timestamp > pool.lastRewardTimestamp && userLockAmount != 0) {
+                if (epoch > pool.lastRewardTimestamp && userLockAmount != 0) {
                     uint256 lrt = pool.lastRewardTimestamp;
                     for (uint i = arvLastRelease; i < epoch; ) {
                         i += 1 days;
                         uint256 timestamp = Math.min(epoch, i);
-                        if (i < epoch) {
-                            rPerSencond = (rPerSencond * 999) / 1000;
-                        }
                         uint256 multiplier = getMultiplier(lrt, timestamp);
                         uint256 reward = multiplier.mul(rPerSencond);
+                        if (timestamp < epoch) {
+                            rPerSencond = (rPerSencond * 999) / 1000;
+                        }
                         rewardPerShare = rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
                         lrt = timestamp;
                     }
@@ -238,12 +239,13 @@ contract MasterChef is Ownable, IMasterChef {
             for (uint i = arvLastRelease; i < epoch; ) {
                 i += 1 days;
                 uint256 timestamp = Math.min(epoch, i);
+                uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, timestamp);
+                uint256 reward = multiplier.mul(pool.rewardPerSecond);
                 if (timestamp < epoch) {
                     arvLastRelease = i;
                     pool.rewardPerSecond = (pool.rewardPerSecond * 999) / 1000;
                 }
-                uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, timestamp);
-                uint256 reward = multiplier.mul(pool.rewardPerSecond);
+                arvCirculatingSupply += reward;
                 pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
                 pool.lastRewardTimestamp = timestamp;
             }
@@ -297,6 +299,7 @@ contract MasterChef is Ownable, IMasterChef {
             _pid = cauldronPoolInfo[msg.sender];
         }
         require(_pid != 0, "deposit CAKE by staking");
+        updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
         if (pool.isDynamicReward) {
             to = msg.sender;
@@ -304,7 +307,6 @@ contract MasterChef is Ownable, IMasterChef {
             require(msg.sender == pool.stakeToken, "only cauldron can deposit non dynamic pool");
         }
         UserInfo storage user = userInfo[_pid][to];
-        updatePool(_pid);
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             if (pending > 0) {
@@ -336,7 +338,6 @@ contract MasterChef is Ownable, IMasterChef {
 
     function withdrawLock(uint256 _amount) public {
         updatePool(0);
-
         address to = msg.sender;
         uint256 userLockAmount = getLockAmount(to);
         PoolInfo memory pool = poolInfo[0];
@@ -366,6 +367,7 @@ contract MasterChef is Ownable, IMasterChef {
             _pid = cauldronPoolInfo[msg.sender];
         }
         require(_pid != 0, "withdraw CAKE by unstaking");
+        updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
         if (pool.isDynamicReward) {
             to = msg.sender;
@@ -374,8 +376,6 @@ contract MasterChef is Ownable, IMasterChef {
         }
         UserInfo storage user = userInfo[_pid][to];
         require(user.amount >= _amount, "withdraw: not good");
-
-        updatePool(_pid);
         uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
         if (pending > 0) {
             if (!pool.isDynamicReward) {
@@ -425,10 +425,10 @@ contract MasterChef is Ownable, IMasterChef {
     }
 
     function claimPending(uint256 _pid) public {
+        updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
         address to = msg.sender;
         UserInfo storage user = userInfo[_pid][to];
-        updatePool(_pid);
         if (_pid == 0) {
             uint256 userLockAmount = getLockAmount(to);
             if (userLockAmount > 0) {
@@ -496,5 +496,26 @@ contract MasterChef is Ownable, IMasterChef {
         emit EmergencyWithdraw(operator, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+    }
+
+    function estimateARVCirculatingSupply() public view returns (uint256 circulatingSupply) {
+        PoolInfo memory pool = poolInfo[0];
+        uint256 rPerSencond = pool.rewardPerSecond;
+        uint256 epoch = block.timestamp;
+        circulatingSupply = arvCirculatingSupply;
+        if (block.timestamp > pool.lastRewardTimestamp) {
+            uint256 lrt = pool.lastRewardTimestamp;
+            for (uint i = arvLastRelease; i < epoch; ) {
+                i += 1 days;
+                uint256 timestamp = Math.min(epoch, i);
+                uint256 multiplier = getMultiplier(lrt, timestamp);
+                uint256 reward = multiplier.mul(rPerSencond);
+                if (i < epoch) {
+                    rPerSencond = (rPerSencond * 999) / 1000;
+                }
+                circulatingSupply += reward;
+                lrt = timestamp;
+            }
+        }
     }
 }

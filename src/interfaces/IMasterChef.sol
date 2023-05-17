@@ -33,6 +33,22 @@ interface IMasterChef {
 
     function userPendingReward(address user) external returns (uint256 pendingReward);
 
+    function userInfo(uint256 _pid, address user) external view returns (uint256 amount, uint256 debt);
+
+    function poolInfo(
+        uint256 _pid
+    )
+        external
+        view
+        returns (
+            address stakeToken,
+            address rewardToken,
+            uint256 lastRewardTimestamp,
+            uint256 rewardPerSecond,
+            uint256 rewardPerShare, //multiply 1e20
+            bool isDynamicReward
+        );
+
     function getLockAmount(address user) external view returns (uint256 amount);
 
     function getLockInfo(address user) external view returns (LockDetail[] memory locks);
