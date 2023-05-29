@@ -12,11 +12,9 @@
 
 pragma solidity >=0.8.0;
 import "BoringSolidity/BoringOwnable.sol";
-import "BoringSolidity/ERC20.sol";
+import "BoringSolidity/interfaces/IERC20.sol";
 import "BoringSolidity/interfaces/IMasterContract.sol";
 import "BoringSolidity/libraries/BoringRebase.sol";
-import "BoringSolidity/libraries/BoringERC20.sol";
-import "libraries/compat/BoringMath.sol";
 import "interfaces/IOracle.sol";
 import "interfaces/ISwapperV2.sol";
 import "interfaces/IBentoBoxV1.sol";
@@ -31,10 +29,7 @@ import "interfaces/IMasterChef.sol";
 /// @dev This contract allows contract calls to any contract (except BentoBox)
 /// from arbitrary callers thus, don't trust calls from this contract in any circumstances.
 contract CauldronV4 is BoringOwnable, IMasterContract {
-    using BoringMath for uint256;
-    using BoringMath128 for uint128;
     using RebaseLibrary for Rebase;
-    using BoringERC20 for IERC20;
 
     event LogExchangeRate(uint256 rate);
     event LogAccrue(uint128 accruedAmount);
@@ -189,10 +184,10 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         }
 
         // Accrue interest
-        uint128 extraAmount = (uint256(_totalBorrow.elastic).mul(_accrueInfo.INTEREST_PER_SECOND).mul(elapsedTime) / 1e18).to128();
-        _totalBorrow.elastic = _totalBorrow.elastic.add(extraAmount);
+        uint128 extraAmount = uint128((uint256(_totalBorrow.elastic) * _accrueInfo.INTEREST_PER_SECOND * elapsedTime) / 1e18);
+        _totalBorrow.elastic = _totalBorrow.elastic + extraAmount;
         interestPerPart += (extraAmount * 1e20) / _totalBorrow.base;
-        _accrueInfo.feesEarned = _accrueInfo.feesEarned.add(extraAmount);
+        _accrueInfo.feesEarned = _accrueInfo.feesEarned + extraAmount;
         totalBorrow = _totalBorrow;
         accrueInfo = _accrueInfo;
 
@@ -213,11 +208,11 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         return
             bentoBox.toAmount(
                 collateral,
-                collateralShare.mul(EXCHANGE_RATE_PRECISION / COLLATERIZATION_RATE_PRECISION).mul(COLLATERIZATION_RATE),
+                ((collateralShare * EXCHANGE_RATE_PRECISION) / COLLATERIZATION_RATE_PRECISION) * COLLATERIZATION_RATE,
                 false
             ) >=
             // Moved exchangeRate here instead of dividing the other side to preserve more precision
-            borrowPart.mul(_totalBorrow.elastic).mul(_exchangeRate) / _totalBorrow.base;
+            (borrowPart * _totalBorrow.elastic * _exchangeRate) / _totalBorrow.base;
     }
 
     /// @dev Checks if the user is solvent in the closed liquidation case at the end of the function body.
@@ -252,7 +247,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     /// False if tokens from msg.sender in `bentoBox` should be transferred.
     function _addTokens(IERC20 token, uint256 share, uint256 total, bool skim) internal {
         if (skim) {
-            require(share <= bentoBox.balanceOf(token, address(this)).sub(total), "Cauldron: Skim too much");
+            require(share <= bentoBox.balanceOf(token, address(this)) - total, "Cauldron: Skim too much");
         } else {
             bentoBox.transfer(token, msg.sender, address(this), share);
         }
@@ -266,9 +261,9 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     /// False if tokens from msg.sender in `bentoBox` should be transferred.
     /// @param share The amount of shares to add for `to`.
     function addCollateral(address to, bool skim, uint256 share) public virtual {
-        userCollateralShare[to] = userCollateralShare[to].add(share);
+        userCollateralShare[to] = userCollateralShare[to] + share;
         uint256 oldTotalCollateralShare = totalCollateralShare;
-        totalCollateralShare = oldTotalCollateralShare.add(share);
+        totalCollateralShare = oldTotalCollateralShare + share;
         _addTokens(collateral, share, oldTotalCollateralShare, skim);
         _afterAddCollateral(to, share);
         emit LogAddCollateral(skim ? address(bentoBox) : msg.sender, to, share);
@@ -278,8 +273,8 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
 
     /// @dev Concrete implementation of `removeCollateral`.
     function _removeCollateral(address to, uint256 share) internal virtual {
-        userCollateralShare[msg.sender] = userCollateralShare[msg.sender].sub(share);
-        totalCollateralShare = totalCollateralShare.sub(share);
+        userCollateralShare[msg.sender] = userCollateralShare[msg.sender] - share;
+        totalCollateralShare = totalCollateralShare - share;
         _afterRemoveCollateral(msg.sender, to, share);
         emit LogRemoveCollateral(msg.sender, to, share);
         bentoBox.transfer(collateral, address(this), to, share);
@@ -299,16 +294,16 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     /// @dev Concrete implementation of `borrow`.
     function _borrow(address to, uint256 amount) internal returns (uint256 part, uint256 share) {
         handleRefund(msg.sender);
-        uint256 feeAmount = amount.mul(BORROW_OPENING_FEE) / BORROW_OPENING_FEE_PRECISION; // A flat % fee is charged for any borrow
-        (Rebase memory _totalBorrow, uint256 temp) = totalBorrow.add(amount.add(feeAmount), true);
+        uint256 feeAmount = (amount * BORROW_OPENING_FEE) / BORROW_OPENING_FEE_PRECISION; // A flat % fee is charged for any borrow
+        (Rebase memory _totalBorrow, uint256 temp) = totalBorrow.add(amount + feeAmount, true);
         part = temp;
         BorrowCap memory cap = borrowLimit;
 
         require(_totalBorrow.elastic <= cap.total, "Borrow Limit reached");
 
-        accrueInfo.feesEarned = accrueInfo.feesEarned.add(uint128(feeAmount));
+        accrueInfo.feesEarned = accrueInfo.feesEarned + (uint128(feeAmount));
 
-        uint256 newBorrowPart = userBorrowPart[msg.sender].add(part);
+        uint256 newBorrowPart = userBorrowPart[msg.sender] + (part);
         require(newBorrowPart <= cap.borrowPartPerAddress, "Borrow Limit reached");
         _preBorrowAction(to, amount, newBorrowPart, part);
         userBorrowPart[msg.sender] = newBorrowPart;
@@ -319,7 +314,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         bentoBox.transfer(magicInternetMoney, address(this), to, share);
         IMasterChef(distributeTo).deposit(msg.sender);
         totalBorrow = _totalBorrow;
-        emit LogBorrow(msg.sender, to, amount.add(feeAmount), part);
+        emit LogBorrow(msg.sender, to, amount + feeAmount, part);
     }
 
     /// @notice Sender borrows `amount` and transfers it to `to`.
@@ -337,15 +332,14 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
             // uint256 share = totalBorrow.toBase(_interestRefund, false);
             uint256 share = bentoBox.toShare(magicInternetMoney, _interestRefund, false);
             bentoBox.transfer(magicInternetMoney, (address(this)), user, share);
-            uint256 _feesEarned = accrueInfo.feesEarned;
-            accrueInfo.feesEarned = uint128(_feesEarned - (_interestRefund));
+            accrueInfo.feesEarned -= uint128(_interestRefund);
         }
     }
 
     /// @dev Concrete implementation of `repay`.
     function _repay(address to, bool skim, uint256 part) internal returns (uint256 amount) {
         handleRefund(to);
-        userBorrowPart[to] = userBorrowPart[to].sub(part);
+        userBorrowPart[to] = userBorrowPart[to] - (part);
         IMasterChef(distributeTo).withdraw(to);
         (totalBorrow, amount) = totalBorrow.sub(part, true);
         userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / 1e20;
@@ -589,18 +583,17 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
                 {
                     uint256 availableBorrowPart = userBorrowPart[user];
                     borrowPart = maxBorrowParts[i] > availableBorrowPart ? availableBorrowPart : maxBorrowParts[i];
-                    userBorrowPart[user] = availableBorrowPart.sub(borrowPart);
+                    userBorrowPart[user] = availableBorrowPart - borrowPart;
                     userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / 1e20;
                 }
                 uint256 borrowAmount = totalBorrow.toElastic(borrowPart, false);
                 uint256 collateralShare = bentoBoxTotals.toBase(
-                    borrowAmount.mul(LIQUIDATION_MULTIPLIER).mul(_exchangeRate) /
-                        (LIQUIDATION_MULTIPLIER_PRECISION * EXCHANGE_RATE_PRECISION),
+                    ((borrowAmount * LIQUIDATION_MULTIPLIER * _exchangeRate) / LIQUIDATION_MULTIPLIER_PRECISION) * EXCHANGE_RATE_PRECISION,
                     false
                 );
 
                 _beforeUserLiquidated(user, borrowPart, borrowAmount, collateralShare);
-                userCollateralShare[user] = userCollateralShare[user].sub(collateralShare);
+                userCollateralShare[user] = userCollateralShare[user] - (collateralShare);
                 _afterUserLiquidated(user, collateralShare);
 
                 emit LogRemoveCollateral(user, to, collateralShare);
@@ -608,27 +601,25 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
                 emit LogLiquidation(msg.sender, user, to, collateralShare, borrowAmount, borrowPart);
 
                 // Keep totals
-                allCollateralShare = allCollateralShare.add(collateralShare);
-                allBorrowAmount = allBorrowAmount.add(borrowAmount);
-                allBorrowPart = allBorrowPart.add(borrowPart);
+                allCollateralShare = allCollateralShare + collateralShare;
+                allBorrowAmount = allBorrowAmount + borrowAmount;
+                allBorrowPart = allBorrowPart + borrowPart;
             }
         }
         require(allBorrowAmount != 0, "Cauldron: all are solvent");
-        for (uint256 i = 0; i < users.length; i++) {
-            IMasterChef(distributeTo).withdraw(users[i]);
-        }
-        totalBorrow.elastic = totalBorrow.elastic.sub(allBorrowAmount.to128());
-        totalBorrow.base = totalBorrow.base.sub(allBorrowPart.to128());
-        totalCollateralShare = totalCollateralShare.sub(allCollateralShare);
+        IMasterChef(distributeTo).withdraw(users);
+        totalBorrow.elastic = totalBorrow.elastic - uint128(allBorrowAmount);
+        totalBorrow.base = totalBorrow.base - uint128(allBorrowPart);
+        totalCollateralShare = totalCollateralShare - (allCollateralShare);
 
         // Apply a percentual fee share to sSpell holders
 
         {
-            uint256 distributionAmount = (allBorrowAmount.mul(LIQUIDATION_MULTIPLIER) / LIQUIDATION_MULTIPLIER_PRECISION)
-                .sub(allBorrowAmount)
-                .mul(DISTRIBUTION_PART) / DISTRIBUTION_PRECISION; // Distribution Amount
-            allBorrowAmount = allBorrowAmount.add(distributionAmount);
-            accrueInfo.feesEarned = accrueInfo.feesEarned.add(distributionAmount.to128());
+            uint256 distributionAmount = (((allBorrowAmount * LIQUIDATION_MULTIPLIER) /
+                LIQUIDATION_MULTIPLIER_PRECISION -
+                allBorrowAmount) * DISTRIBUTION_PART) / DISTRIBUTION_PRECISION; // Distribution Amount
+            allBorrowAmount = allBorrowAmount + distributionAmount;
+            accrueInfo.feesEarned = accrueInfo.feesEarned + uint128(distributionAmount);
         }
 
         uint256 allBorrowShare = bentoBox.toShare(magicInternetMoney, allBorrowAmount, true);
@@ -648,39 +639,27 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     function withdrawFees() public {
         accrue();
         address _feeTo = masterContract.feeTo();
-        uint256 _feesEarned = accrueInfo.feesEarned;
-        address _distributeTo = masterContract.distributeTo();
-        uint256 share = bentoBox.toShare(magicInternetMoney, _feesEarned, false);
-        uint256 shareNeedWithdraw = 0;
-        IMasterChef masterChef = IMasterChef(_distributeTo);
-        uint256 totalStake1 = masterChef.totalStake(1);
-        uint256 totalStake2 = masterChef.totalStake(2);
-        if (totalStake1 > 0 && totalStake2 > 0) {
-            (uint256 amountOut, ) = bentoBox.withdraw(magicInternetMoney, address(this), address(this), 0, (share * 60) / 100);
+        address _distributeTo = distributeTo;
+        uint256 share = bentoBox.toShare(magicInternetMoney, accrueInfo.feesEarned, false);
+        uint256 shareNeedWithdraw = IMasterChef(_distributeTo).getShareThatShouldDistribute();
+        if (shareNeedWithdraw > 0) {
+            (uint256 amountOut, ) = bentoBox.withdraw(
+                magicInternetMoney,
+                address(this),
+                address(this),
+                0,
+                (share * shareNeedWithdraw) / 100
+            );
             magicInternetMoney.approve(_distributeTo, amountOut);
-            masterChef.addRewardToPool(1, amountOut - amountOut / 6);
-            masterChef.addRewardToPool(2, amountOut / 6);
-            shareNeedWithdraw = 60;
-        } else if (totalStake1 > 0) {
-            //50% distribute to the vin stakers
-            (uint256 amountOut, ) = bentoBox.withdraw(magicInternetMoney, address(this), address(this), 0, (share * 50) / 100);
-            magicInternetMoney.approve(_distributeTo, amountOut);
-            masterChef.addRewardToPool(1, amountOut);
-            shareNeedWithdraw = 50;
-        } else if (totalStake2 > 0) {
-            //20% of 50% tresury income distribute to the arv stakers
-            (uint256 amountOut, ) = bentoBox.withdraw(magicInternetMoney, address(this), address(this), 0, (share * 10) / 100);
-            magicInternetMoney.approve(_distributeTo, amountOut);
-            masterChef.addRewardToPool(2, amountOut);
-            shareNeedWithdraw = 10;
+            IMasterChef(_distributeTo).addRewardToPool(amountOut);
         }
         accrueInfo.feesEarned = 0;
 
         bentoBox.transfer(magicInternetMoney, address(this), _feeTo, (share * (100 - shareNeedWithdraw)) / 100);
         emit LogWithdrawFees(_feeTo, (share * (100 - shareNeedWithdraw)) / 100);
-        if (shareNeedWithdraw > 0) {
-            emit LogWithdrawFees(_distributeTo, (share * shareNeedWithdraw) / 100);
-        }
+        // if (shareNeedWithdraw > 0) {
+        //     emit LogWithdrawFees(_distributeTo, (share * shareNeedWithdraw) / 100);
+        // }
     }
 
     /// @notice Sets the beneficiary of interest accrued.

@@ -15,7 +15,7 @@ interface IMasterChef {
         bool isClaimed;
     }
 
-    function addRewardToPool(uint256 poolId, uint256 amount) external;
+    function addRewardToPool(uint256 amount) external;
 
     function deposit(uint256 _pid, uint256 _amount) external;
 
@@ -27,7 +27,11 @@ interface IMasterChef {
 
     function withdraw(address to) external;
 
+    function withdraw(address[] calldata to) external;
+
     function withdrawLock(uint256 _amount) external;
+
+    function getShareThatShouldDistribute() external view returns (uint256 share);
 
     function totalStake(uint256 _pid) external returns (uint256 stakeAmount);
 
@@ -63,5 +67,5 @@ interface IMasterChef {
 
     function emergencyWithdraw(uint256 _pid) external;
 
-    function estimateARVCirculatingSupply() public view returns (uint256 circulatingSupply);
+    function estimateARVCirculatingSupply() external view returns (uint256 circulatingSupply);
 }

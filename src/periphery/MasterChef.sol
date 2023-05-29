@@ -110,12 +110,21 @@ contract MasterChef is Ownable, IMasterChef {
         );
     }
 
-    function addRewardToPool(uint256 poolId, uint256 amount) public {
-        PoolInfo storage pool = poolInfo[poolId];
-        require(pool.isDynamicReward, "can not add reward");
-        IStrictERC20 reward = IStrictERC20(pool.rewardToken);
+    function addRewardToPool(uint256 amount) public {
+        uint256 totalStake1 = totalStake[1];
+        uint256 totalStake2 = totalStake[2];
+        IStrictERC20 reward = IStrictERC20(inToken);
         reward.transferFrom(msg.sender, address(this), amount);
-        pool.rewardPerShare += (amount * 1e20) / totalStake[poolId];
+        if (totalStake1 > 0 && totalStake2 > 0) {
+            poolInfo[1].rewardPerShare += ((amount - (amount / 6)) * 1e20) / totalStake1;
+            poolInfo[2].rewardPerShare += ((amount / 6) * 1e20) / totalStake2;
+        } else if (totalStake1 > 0) {
+            //50% distribute to the vin stakers
+            poolInfo[1].rewardPerShare += (amount * 1e20) / totalStake1;
+        } else if (totalStake2 > 0) {
+            //20% of 50% tresury income distribute to the arv stakers
+            poolInfo[2].rewardPerShare += (amount * 1e20) / totalStake2;
+        }
     }
 
     function poolLength() external view returns (uint256) {
@@ -246,9 +255,21 @@ contract MasterChef is Ownable, IMasterChef {
                     pool.rewardPerSecond = (pool.rewardPerSecond * 999) / 1000;
                 }
                 arvCirculatingSupply += reward;
-                pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
+                if (totalVinLock > 0) {
+                    pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
+                }
                 pool.lastRewardTimestamp = timestamp;
             }
+        } else if (LP_POOL == _pid) {
+            uint256 lpSupply = totalStake[_pid];
+            if (lpSupply == 0) {
+                pool.lastRewardTimestamp = block.timestamp;
+                return;
+            }
+            uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
+            uint256 reward = multiplier.mul(pool.rewardPerSecond);
+            pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(lpSupply));
+            pool.lastRewardTimestamp = block.timestamp;
         } else {
             Rebase memory lpSupply = ICauldronV4(pool.stakeToken).totalBorrow();
             if (lpSupply.base == 0) {
@@ -352,6 +373,12 @@ contract MasterChef is Ownable, IMasterChef {
         user.rewardDebt = userLockAmount.mul(pool.rewardPerShare).div(1e20);
         totalVinLock -= _amount;
         _withdraw(address(0), 1, _amount, true);
+    }
+
+    function withdraw(address[] calldata to) public {
+        for (uint256 i = 0; i < to.length; i++) {
+            withdraw(to[i]);
+        }
     }
 
     function withdraw(address to) public {
@@ -517,5 +544,9 @@ contract MasterChef is Ownable, IMasterChef {
                 lrt = timestamp;
             }
         }
+    }
+
+    function getShareThatShouldDistribute() public view returns (uint256 share) {
+        share = (totalStake[1] > 0 ? 50 : 0) + (totalStake[2] > 0 ? 10 : 0);
     }
 }
