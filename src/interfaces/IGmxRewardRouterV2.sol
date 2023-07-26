@@ -15,6 +15,8 @@ interface IGmxRewardRouterV2 {
 
     function bnGmx() external view returns (address);
 
+    function weth() external view returns (address);
+
     function bonusGmxTracker() external view returns (address);
 
     function claim() external;
@@ -89,26 +91,13 @@ interface IGmxRewardRouterV2 {
 
     function stakedGmxTracker() external view returns (address);
 
-    function unstakeAndRedeemGlp(
-        address _tokenOut,
-        uint256 _glpAmount,
-        uint256 _minOut,
-        address _receiver
-    ) external returns (uint256);
+    function unstakeAndRedeemGlp(address _tokenOut, uint256 _glpAmount, uint256 _minOut, address _receiver) external returns (uint256);
 
-    function unstakeAndRedeemGlpETH(
-        uint256 _glpAmount,
-        uint256 _minOut,
-        address _receiver
-    ) external returns (uint256);
+    function unstakeAndRedeemGlpETH(uint256 _glpAmount, uint256 _minOut, address _receiver) external returns (uint256);
 
     function unstakeEsGmx(uint256 _amount) external;
 
     function unstakeGmx(uint256 _amount) external;
 
-    function withdrawToken(
-        address _token,
-        address _account,
-        uint256 _amount
-    ) external;
+    function withdrawToken(address _token, address _account, uint256 _amount) external;
 }

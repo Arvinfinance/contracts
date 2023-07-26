@@ -50,6 +50,7 @@ contract MasterChef is Ownable, IMasterChef {
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(address => VestingInfo[]) public userVestingInfo;
+    mapping(address => uint256) public userVestingIndex;
     mapping(address => uint256) public userPendingReward;
 
     uint256 public constant LOCK_POOL = 0;
@@ -155,6 +156,10 @@ contract MasterChef is Ownable, IMasterChef {
         require(!pool.isDynamicReward && _pid != 0, "can not update reward");
         updatePool(_pid);
         pool.rewardPerSecond = _rewardPerSecond;
+    }
+
+    function withdrawReward(address token, uint256 amount) external onlyOwner {
+        IStrictERC20(token).transfer(msg.sender, amount);
     }
 
     // Return reward multiplier over the given _from to _to block.
@@ -319,6 +324,9 @@ contract MasterChef is Ownable, IMasterChef {
         if (_pid == 0) {
             _pid = cauldronPoolInfo[msg.sender];
         }
+        if (_pid == 0) {
+            return;
+        }
         require(_pid != 0, "deposit CAKE by staking");
         updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
@@ -392,6 +400,9 @@ contract MasterChef is Ownable, IMasterChef {
     function _withdraw(address to, uint256 _pid, uint256 _amount, bool unlockVIN) private {
         if (_pid == 0) {
             _pid = cauldronPoolInfo[msg.sender];
+        }
+        if (_pid == 0) {
+            return;
         }
         require(_pid != 0, "withdraw CAKE by unstaking");
         updatePool(_pid);
@@ -493,14 +504,18 @@ contract MasterChef is Ownable, IMasterChef {
     function claimVestingReward() public {
         VestingInfo[] storage details = userVestingInfo[msg.sender];
         uint256 reward = 0;
-        for (uint256 i = 0; i < details.length; i++) {
-            if (!details[i].isClaimed && details[i].claimTime <= block.timestamp) {
-                details[i].isClaimed = true;
-                reward += details[i].vestingReward;
-            } else {
-                break;
+        uint256 i;
+        for (i = userVestingIndex[msg.sender]; i < details.length; i++) {
+            if (!details[i].isClaimed) {
+                if (details[i].claimTime <= block.timestamp) {
+                    details[i].isClaimed = true;
+                    reward += details[i].vestingReward;
+                } else {
+                    break;
+                }
             }
         }
+        userVestingIndex[msg.sender] = i;
         vin.transfer(msg.sender, reward);
     }
 

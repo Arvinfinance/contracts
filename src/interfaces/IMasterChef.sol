@@ -68,4 +68,6 @@ interface IMasterChef {
     function emergencyWithdraw(uint256 _pid) external;
 
     function estimateARVCirculatingSupply() external view returns (uint256 circulatingSupply);
+
+    function cauldronPoolInfo(address cauldron) external view returns (uint256);
 }

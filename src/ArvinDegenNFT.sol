@@ -1,32 +1,44 @@
 // SPDX-License-Identifier: None
 pragma solidity ^0.8.0;
-import "OpenZeppelin/token/ERC1155/ERC1155.sol";
+import "OpenZeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
 import "OpenZeppelin/utils/math/Math.sol";
 import "interfaces/IArvinDegenNFT.sol";
+import "forge-std/console.sol";
 
-contract ArvinDegenNFT is ERC1155, IArvinDegenNFT {
-    string public name;
-    string public symbol;
+contract ArvinDegenNFT is ERC721Enumerable, IArvinDegenNFT {
+    uint256 constant Common = 650; //2%
+    uint256 constant Uncommon = 200; //5%
+    uint256 constant Rare = 100; //10%
+    uint256 constant Legendary = 50; //20%
 
-    uint256 constant DIAMOND = 0;
-    uint256 constant GOLDEN = 1;
-    uint256 constant SILVER = 2;
-    uint256 constant BRONZE = 3;
+    constructor(string memory _uri, address _treasury) ERC721("Arvin Degen NFT", "ADNFT") {
+        // for (uint256 i = 0; i < 1000; i++) {
+        //     _mint(_treasury, i);
+        // }
+    }
 
-    constructor(string memory _uri, address _treasury) ERC1155(_uri) {
-        name = "Arvin Degen NFT";
-        symbol = "AD";
-        _mint(_treasury, DIAMOND, 111, "");
-        _mint(_treasury, GOLDEN, 333, "");
-        _mint(_treasury, SILVER, 666, "");
-        _mint(_treasury, BRONZE, 2223, "");
+    function _baseURI() internal view virtual override returns (string memory) {
+        return "ipfs://abc/";
     }
 
     function getRefundRatio(address user) public view returns (uint256) {
-        uint256 diamondBalance = balanceOf(user, DIAMOND);
-        uint256 goldenBalance = balanceOf(user, GOLDEN);
-        uint256 silverBalance = balanceOf(user, SILVER);
-        uint256 bronzeBalance = balanceOf(user, BRONZE);
-        return Math.min(diamondBalance * 20 + goldenBalance * 10 + silverBalance * 5 + bronzeBalance * 2, 20);
+        uint256 balance = balanceOf(user);
+        uint256 rate = 0;
+        for (uint256 i = 0; i < balance; i++) {
+            uint tokenId = tokenOfOwnerByIndex(user, i);
+            if (tokenId < 650) {
+                rate += 2;
+            } else if (tokenId < 850) {
+                rate += 2;
+            } else if (tokenId < 950) {
+                rate += 10;
+            } else if (tokenId < 1000) {
+                rate += 20;
+            }
+            if (rate >= 20) {
+                break;
+            }
+        }
+        return Math.min(rate, 20);
     }
 }

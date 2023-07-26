@@ -10,7 +10,6 @@ import "libraries/compat/BoringMath.sol";
 import "interfaces/IBentoBoxV1.sol";
 
 /// @title Cauldron
-/// @dev This contract allows contract calls to any contract (except BentoBox)
 /// from arbitrary callers thus, don't trust calls from this contract in any circumstances.
 contract IN is ERC20, BoringOwnable {
     using BoringMath for uint256;

@@ -21,7 +21,7 @@ contract ArvinScript is BaseScript {
     function deploy() public {
         startBroadcast();
 
-        IWETH weth = IWETH(0x7F5bc2250ea57d8ca932898297b1FF9aE1a04999);
+        IWETH weth = IWETH(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
         DegenBox degenBox = new DegenBox(IERC20(weth));
         ArvinDegenNFT nft = new ArvinDegenNFT("", msg.sender);
         ARV arv = new ARV();
@@ -30,17 +30,17 @@ contract ArvinScript is BaseScript {
         MasterChef mc = new MasterChef(address(arv), address(vin), address(_in), address(0), block.timestamp);
         CauldronV4 cauldronV4MC = new CauldronV4(IBentoBoxV1(address(degenBox)), _in, address(mc), address(nft));
         cauldronV4MC.setFeeTo(msg.sender);
-        ProxyOracle oracle = OracleLib.deploySimpleInvertedOracle("ETH/USD", IAggregator(0x62CAe0FA2da220f43a51F86Db2EDb36DcA9A5A08));
+        ProxyOracle oracle = OracleLib.deploySimpleInvertedOracle("ETH/USD", IAggregator(0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612));
         ICauldronV4 ethCauldronV4 = CauldronDeployLib.deployCauldronV4(
             IBentoBoxV1(address(degenBox)),
             address(cauldronV4MC),
             IERC20(weth),
             oracle,
             "",
-            85000, // 85% ltv
-            3500, // 3.5% interests
-            500, // 0.5% opening
-            110000 // 10% liquidation
+            8500, // 85% ltv
+            350, // 3.5% interests
+            50, // 0.5% opening
+            1000 // 10% liquidation
         );
 
         vm.label(address(ethCauldronV4), "ethCauldronV4");
