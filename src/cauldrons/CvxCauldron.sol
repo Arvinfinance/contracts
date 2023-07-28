@@ -12,7 +12,7 @@
 
 pragma solidity >=0.8.0;
 import "./CauldronV4.sol";
-import "libraries/MuxLib.sol";
+import "libraries/CvxLib.sol";
 
 // solhint-disable avoid-low-level-calls
 // solhint-disable no-inline-assembly
@@ -20,7 +20,7 @@ import "libraries/MuxLib.sol";
 /// @title Cauldron
 /// @dev This contract allows contract calls to any contract (except BentoBox)
 /// from arbitrary callers thus, don't trust calls from this contract in any circumstances.
-contract MuxCauldron is CauldronV4 {
+contract CvxCauldron is CauldronV4 {
     address public immutable rewardRouter;
     address public immutable baseContract;
     uint256 public rewardPershare;
@@ -55,7 +55,6 @@ contract MuxCauldron is CauldronV4 {
 
     function _beforeRemoveCollateral(address from, address, uint256 collateralShare) internal virtual override {
         _harvest(from);
-        _unstake(collateralShare);
     }
 
     function _afterAddCollateral(address user, uint256 collateralShare) internal virtual override {
@@ -64,15 +63,16 @@ contract MuxCauldron is CauldronV4 {
     }
 
     function _afterRemoveCollateral(address from, address, uint256 collateralShare) internal virtual override {
+        _unstake(collateralShare);
         _updateUserDebt(from);
     }
 
     function _beforeUserLiquidated(address user, uint256, uint256, uint256 collateralShare) internal virtual override {
         _harvest(user);
-        _unstake(collateralShare);
     }
 
     function _afterUserLiquidated(address user, uint256 collateralShare) internal virtual override {
+        _unstake(collateralShare);
         _updateUserDebt(user);
     }
 
@@ -82,7 +82,12 @@ contract MuxCauldron is CauldronV4 {
         IStrictERC20(token).transfer(msg.sender, IERC20(token).balanceOf(address(this)));
     }
 
-    function pendingReward(address user) external view returns (uint256) {
+    //the convex contract can not get the pending reward on chain, so the pending reward have to be transmited by the frontend.
+    function pendingReward(address user, uint256 pending) external view returns (uint256) {
+        uint256 rpc = rewardPershare;
+        if (pending > 0) {
+            rpc += (pending * 1e20) / totalCollateralShare;
+        }
         return (userCollateralShare[user] * rewardPershare) / 1e20 - userRwardDebt[user];
     }
 
@@ -99,15 +104,15 @@ contract MuxCauldron is CauldronV4 {
     }
 
     function _stake(address user, uint256 collateralShare) private {
-        MuxLib.stake(bentoBox, collateral, rewardRouter, collateralShare);
+        CvxLib.stake(bentoBox, collateral, rewardRouter, collateralShare);
     }
 
     function _unstake(uint256 collateralShare) private {
-        MuxLib.unstake(bentoBox, collateral, rewardRouter, collateralShare);
+        CvxLib.unstake(bentoBox, collateral, rewardRouter, collateralShare);
     }
 
     function _harvest(address user) private {
-        rewardPershare = MuxLib.harvest(
+        rewardPershare = CvxLib.harvest(
             rewardRouter,
             user,
             userCollateralShare[user],

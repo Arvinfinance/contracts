@@ -61,6 +61,8 @@ interface IMasterChef {
 
     function getUnlockableAmount(address user) external view returns (uint256 amount);
 
+    function getUserVestingInfo(address user) external returns (VestingInfo[] memory);
+
     function vestingPendingReward(bool claim) external;
 
     function claimVestingReward() external;

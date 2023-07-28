@@ -501,6 +501,10 @@ contract MasterChef is Ownable, IMasterChef {
         userPendingReward[msg.sender] = 0;
     }
 
+    function getUserVestingInfo(address user) external returns (VestingInfo[] memory) {
+        return userVestingInfo[user];
+    }
+
     function claimVestingReward() public {
         VestingInfo[] storage details = userVestingInfo[msg.sender];
         uint256 reward = 0;

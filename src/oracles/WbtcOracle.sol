@@ -2,13 +2,13 @@
 pragma solidity >=0.8.0;
 
 import "interfaces/IOracle.sol";
-import "interfaces/IGmxGlpManager.sol";
+import "interfaces/IAggregator.sol";
 
-contract GlpOracle is IOracle {
-    IGmxGlpManager private immutable glpManager;
+contract WbtcOracle is IOracle {
+    IAggregator private immutable aggregator;
 
-    constructor(IGmxGlpManager glpManager_) {
-        glpManager = glpManager_;
+    constructor(address _aggregator) {
+        aggregator = IAggregator(_aggregator);
     }
 
     function decimals() external pure returns (uint8) {
@@ -16,7 +16,7 @@ contract GlpOracle is IOracle {
     }
 
     function _get() internal view returns (uint256) {
-        return 1e48 / glpManager.getPrice(false);
+        return 1e16 / uint256(aggregator.latestAnswer());
     }
 
     // Get the latest exchange rate
@@ -39,11 +39,11 @@ contract GlpOracle is IOracle {
 
     /// @inheritdoc IOracle
     function name(bytes calldata) public pure override returns (string memory) {
-        return "Glp USD Oracle";
+        return "WBTC USD Oracle";
     }
 
     /// @inheritdoc IOracle
     function symbol(bytes calldata) public pure override returns (string memory) {
-        return "Glp/USD";
+        return "WBTC/USD";
     }
 }

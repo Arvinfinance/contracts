@@ -1,10 +1,16 @@
 pragma solidity >=0.8.0;
 import "interfaces/IGmxRewardRouterV2.sol";
 import "interfaces/IBentoBoxV1.sol";
+import "interfaces/IGmxRewardTracker.sol";
 
 library GmxLib {
-    function getTrackers(address rewardRouter) external view returns (address stakedGmxTracker, address feeGmxTracker) {
-        return (IGmxRewardRouterV2(rewardRouter).stakedGmxTracker(), IGmxRewardRouterV2(rewardRouter).feeGmxTracker());
+    function getTrackers(address rewardRouter, bool isGlp) external view returns (address stakedTracker, address feeTracker) {
+        if (!isGlp) return (IGmxRewardRouterV2(rewardRouter).stakedGmxTracker(), IGmxRewardRouterV2(rewardRouter).feeGmxTracker());
+        return (IGmxRewardRouterV2(rewardRouter).stakedGlpTracker(), IGmxRewardRouterV2(rewardRouter).feeGlpTracker());
+    }
+
+    function getClaimable(address feeTracker, address user) external view returns (uint256) {
+        return IGmxRewardTracker(feeTracker).claimable(user);
     }
 
     function unstake(IBentoBoxV1 bentoBox, IERC20 collateral, address rewardRouter, uint256 collateralShare, bool isGLP) external {

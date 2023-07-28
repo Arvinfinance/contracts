@@ -26,7 +26,7 @@ interface ICurvePool {
 
     function add_liquidity(uint256[2] memory amounts, uint256 _min_mint_amount) external;
 
-    function add_liquidity(uint256[3] memory amounts, uint256 _min_mint_amount) external;
+    function add_liquidity(uint256[3] memory amounts, uint256 _min_mint_amount) external payable;
 
     function add_liquidity(uint256[4] memory amounts, uint256 _min_mint_amount) external;
 

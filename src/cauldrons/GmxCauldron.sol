@@ -40,10 +40,7 @@ contract GmxCauldron is CauldronV4 {
     ) CauldronV4(bentoBox_, magicInternetMoney_, distributeTo_, _arvinDegenNftAddress) {
         rewardRouter = _rewardRouter;
         baseContract = _baseContract;
-        (address _stakedGmxTracker, address _feeGmxTracker) = GmxLib.getTrackers(_rewardRouter);
         blacklistedCallees[_rewardRouter] = true;
-        blacklistedCallees[_stakedGmxTracker] = true;
-        blacklistedCallees[_feeGmxTracker] = true;
         blacklistedCallees[address(collateral)] = true;
     }
 
@@ -54,14 +51,13 @@ contract GmxCauldron is CauldronV4 {
         address(baseContract).delegatecall(abi.encodeWithSelector(IMasterContract.init.selector, actualData));
         blacklistedCallees[address(rewardRouter)] = true;
         collateral.approve(address(bentoBox), type(uint256).max);
-        if (!_isGLP) {
-            (address _stakedGmxTracker, address _feeGmxTracker) = GmxLib.getTrackers(rewardRouter);
-            collateral.approve(_stakedGmxTracker, type(uint256).max);
-            blacklistedCallees[_stakedGmxTracker] = true;
-            blacklistedCallees[_feeGmxTracker] = true;
-        } else {
+        (address stakedTracker, address feeTracker) = GmxLib.getTrackers(rewardRouter, _isGLP);
+        if (_isGLP) {
             blacklistedCallees[address(collateral)] = true;
+        } else {
+            collateral.approve(stakedTracker, type(uint256).max);
         }
+        blacklistedCallees[stakedTracker] = true;
         isGLP = _isGLP;
     }
 
@@ -71,7 +67,6 @@ contract GmxCauldron is CauldronV4 {
 
     function _beforeRemoveCollateral(address from, address, uint256 collateralShare) internal virtual override {
         _harvest(from);
-        _unstake(collateralShare);
     }
 
     function _afterAddCollateral(address user, uint256 collateralShare) internal virtual override {
@@ -80,6 +75,7 @@ contract GmxCauldron is CauldronV4 {
     }
 
     function _afterRemoveCollateral(address from, address, uint256 collateralShare) internal virtual override {
+        _unstake(collateralShare);
         _updateUserDebt(from);
     }
 
@@ -93,7 +89,13 @@ contract GmxCauldron is CauldronV4 {
     }
 
     function pendingReward(address user) external view returns (uint256) {
-        return (userCollateralShare[user] * rewardPershare) / 1e20 - userRwardDebt[user];
+        (, address feeTracker) = GmxLib.getTrackers(rewardRouter, isGLP);
+        uint256 pending = GmxLib.getClaimable(feeTracker, address(this));
+        uint256 rpc = rewardPershare;
+        if (pending > 0) {
+            rpc += (pending * 1e20) / totalCollateralShare;
+        }
+        return (userCollateralShare[user] * rpc) / 1e20 - userRwardDebt[user];
     }
 
     function claim() external {
