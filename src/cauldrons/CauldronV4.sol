@@ -133,6 +133,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
 
     uint256 internal constant DISTRIBUTION_PART = 10;
     uint256 internal constant DISTRIBUTION_PRECISION = 100;
+    uint256 internal constant FEE_DIV = 1000;
 
     function onlyMasterContractOwner() private view {
         if (msg.sender != masterContract.owner()) revert CallerIsNotTheOwner();
@@ -198,7 +199,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         // Accrue interest
         uint128 extraAmount = uint128((uint256(_totalBorrow.elastic) * _accrueInfo.INTEREST_PER_SECOND * elapsedTime) / 1e18);
         _totalBorrow.elastic = _totalBorrow.elastic + extraAmount;
-        interestPerPart += (extraAmount * 1e20) / _totalBorrow.base;
+        interestPerPart += (extraAmount * FEE_DIV) / _totalBorrow.base;
         _accrueInfo.feesEarned = _accrueInfo.feesEarned + extraAmount;
         totalBorrow = _totalBorrow;
         accrueInfo = _accrueInfo;
@@ -314,7 +315,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         if (newBorrowPart > cap.borrowPartPerAddress) revert BorrowLimitReached();
         _preBorrowAction(to, amount, newBorrowPart, part);
         userBorrowPart[msg.sender] = newBorrowPart;
-        userBorrowInterestDebt[msg.sender] = (newBorrowPart * interestPerPart) / 1e20;
+        userBorrowInterestDebt[msg.sender] = (newBorrowPart * interestPerPart) / FEE_DIV;
 
         // As long as there are tokens on this contract you can 'mint'... this enables limiting borrows
         share = bentoBox.toShare(magicInternetMoney, amount, false);
@@ -334,7 +335,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
     }
 
     function handleRefund(address user) private {
-        uint256 _interestRefund = (((userBorrowPart[user] * interestPerPart) / 1e20 - userBorrowInterestDebt[user]) *
+        uint256 _interestRefund = (((userBorrowPart[user] * interestPerPart) / FEE_DIV - userBorrowInterestDebt[user]) *
             arvinDegenNFT.getRefundRatio(user)) / 100;
         if (_interestRefund > 0) {
             // uint256 share = totalBorrow.toBase(_interestRefund, false);
@@ -350,7 +351,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
         userBorrowPart[to] = userBorrowPart[to] - (part);
         IMasterChef(distributeTo).withdraw(to);
         (totalBorrow, amount) = totalBorrow.sub(part, true);
-        userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / 1e20;
+        userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / FEE_DIV;
         uint256 share = bentoBox.toShare(magicInternetMoney, amount, true);
         bentoBox.transfer(magicInternetMoney, skim ? address(bentoBox) : msg.sender, address(this), share);
         emit LogRepay(skim ? address(bentoBox) : msg.sender, to, amount, part);
@@ -586,7 +587,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
                     uint256 availableBorrowPart = userBorrowPart[user];
                     borrowPart = maxBorrowParts[i] > availableBorrowPart ? availableBorrowPart : maxBorrowParts[i];
                     userBorrowPart[user] = availableBorrowPart - borrowPart;
-                    userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / 1e20;
+                    userBorrowInterestDebt[to] = (userBorrowPart[to] * interestPerPart) / FEE_DIV;
                 }
                 uint256 borrowAmount = totalBorrow.toElastic(borrowPart, false);
                 uint256 collateralShare = bentoBoxTotals.toBase(

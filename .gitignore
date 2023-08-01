@@ -40,3 +40,4 @@ bin
 typechain/
 abi
 cache_hardhat/
+docs

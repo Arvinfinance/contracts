@@ -88,7 +88,7 @@ contract CvxCauldron is CauldronV4 {
         if (pending > 0) {
             rpc += (pending * 1e20) / totalCollateralShare;
         }
-        return (userCollateralShare[user] * rewardPershare) / 1e20 - userRwardDebt[user];
+        return (userCollateralShare[user] * rpc) / 1e20 - userRwardDebt[user];
     }
 
     function claim() external {

@@ -30,7 +30,7 @@ contract IN is ERC20, BoringOwnable {
     uint256 private constant MINTING_PRECISION = 1e5;
 
     function mint(address to, uint256 amount) public onlyOwner {
-        require(to != address(0), "MIM: no mint to zero address");
+        require(to != address(0), "IN: no mint to zero address");
 
         // Limits the amount minted per period to a convergence function, with the period duration restarting on every mint
         uint256 totalMintedAmount = uint256(lastMint.time < block.timestamp - MINTING_PERIOD ? 0 : lastMint.amount) + (amount);
@@ -50,7 +50,7 @@ contract IN is ERC20, BoringOwnable {
     }
 
     function burn(uint256 amount) public {
-        require(amount <= balanceOf[msg.sender], "MIM: not enough");
+        require(amount <= balanceOf[msg.sender], "IN: not enough");
 
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
