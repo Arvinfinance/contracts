@@ -30,7 +30,7 @@ contract MasterChef is Ownable, IMasterChef {
         uint256 lastRewardTimestamp;
         uint256 rewardPerSecond;
         uint256 rewardPerShare; //multiply 1e20
-        bool isDynamicReward;
+        bool isInspire;
     }
 
     uint256 public arvLastRelease;
@@ -42,7 +42,6 @@ contract MasterChef is Ownable, IMasterChef {
     IStrictERC20 public arv;
     IStrictERC20 public inToken;
     IStrictERC20 public vin;
-    IStrictERC20 public lp;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -62,11 +61,10 @@ contract MasterChef is Ownable, IMasterChef {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    constructor(address _arv, address _vin, address _in, address _lp, uint256 startTimestamp) {
+    constructor(address _arv, address _vin, address _in, uint256 startTimestamp) {
         arv = IStrictERC20(_arv);
         vin = IStrictERC20(_vin);
         inToken = IStrictERC20(_in);
-        lp = IStrictERC20(_lp);
         arvLastRelease = block.timestamp - (block.timestamp % 1 days) + 1 days;
         // staking pool
         poolInfo.push(
@@ -76,7 +74,7 @@ contract MasterChef is Ownable, IMasterChef {
                 lastRewardTimestamp: block.timestamp - (block.timestamp % 1 days) + 1 days,
                 rewardPerSecond: uint256(100 ether) / 1 days,
                 rewardPerShare: 0,
-                isDynamicReward: false
+                isInspire: false
             })
         );
         poolInfo.push(
@@ -86,7 +84,7 @@ contract MasterChef is Ownable, IMasterChef {
                 lastRewardTimestamp: startTimestamp,
                 rewardPerSecond: 0,
                 rewardPerShare: 0,
-                isDynamicReward: true
+                isInspire: false
             })
         );
         poolInfo.push(
@@ -96,17 +94,7 @@ contract MasterChef is Ownable, IMasterChef {
                 lastRewardTimestamp: startTimestamp,
                 rewardPerSecond: 0,
                 rewardPerShare: 0,
-                isDynamicReward: true
-            })
-        );
-        poolInfo.push(
-            PoolInfo({
-                stakeToken: _lp,
-                rewardToken: _vin,
-                lastRewardTimestamp: startTimestamp,
-                rewardPerSecond: uint256(400 ether) / 1 days,
-                rewardPerShare: 0,
-                isDynamicReward: false
+                isInspire: false
             })
         );
     }
@@ -134,7 +122,25 @@ contract MasterChef is Ownable, IMasterChef {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _rewardPerSecond, address _cauldronAddress, uint256 startTimestamp, bool _withUpdate) public onlyOwner {
+    function addPool(uint256 _rewardPerSecond, address _stakeToken, uint256 startTimestamp, bool _withUpdate) public onlyOwner {
+        if (_withUpdate) {
+            massUpdatePools();
+        }
+        poolInfo.push(
+            PoolInfo({
+                stakeToken: _stakeToken,
+                rewardToken: address(vin),
+                lastRewardTimestamp: startTimestamp,
+                rewardPerSecond: _rewardPerSecond,
+                rewardPerShare: 0,
+                isInspire: false
+            })
+        );
+    }
+
+    // Add a new lp to the pool. Can only be called by the owner.
+    // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
+    function addInspire(uint256 _rewardPerSecond, address _cauldronAddress, uint256 startTimestamp, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -146,14 +152,14 @@ contract MasterChef is Ownable, IMasterChef {
                 lastRewardTimestamp: startTimestamp,
                 rewardPerSecond: _rewardPerSecond,
                 rewardPerShare: 0,
-                isDynamicReward: false
+                isInspire: true
             })
         );
     }
 
     function updateRewardPerBlock(uint256 _rewardPerSecond, uint256 _pid) public onlyOwner {
         PoolInfo storage pool = poolInfo[_pid];
-        require(!pool.isDynamicReward && _pid != 0, "can not update reward");
+        require(_pid > 2, "can not update reward");
         updatePool(_pid);
         pool.rewardPerSecond = _rewardPerSecond;
     }
@@ -172,38 +178,41 @@ contract MasterChef is Ownable, IMasterChef {
         PoolInfo memory pool = poolInfo[_pid];
         UserInfo memory user = userInfo[_pid][_user];
         uint256 rewardPerShare = pool.rewardPerShare;
-        if (pool.isDynamicReward) {
-            return (rewardPerShare * user.amount) / 1e20 - user.rewardDebt;
-        } else {
-            if (_pid == 0) {
-                uint256 rPerSencond = pool.rewardPerSecond;
-                uint256 epoch = block.timestamp;
-                uint256 userLockAmount = getLockAmount(_user);
-                if (epoch > pool.lastRewardTimestamp && userLockAmount != 0) {
-                    uint256 lrt = pool.lastRewardTimestamp;
-                    for (uint i = arvLastRelease; i < epoch; ) {
-                        i += 1 days;
-                        uint256 timestamp = Math.min(epoch, i);
-                        uint256 multiplier = getMultiplier(lrt, timestamp);
-                        uint256 reward = multiplier.mul(rPerSencond);
-                        if (timestamp < epoch) {
-                            rPerSencond = (rPerSencond * 999) / 1000;
-                        }
-                        rewardPerShare = rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
-                        lrt = timestamp;
-                    }
-                }
-                return userLockAmount.mul(rewardPerShare).div(1e20).sub(user.rewardDebt);
-            } else {
-                Rebase memory lpSupply = ICauldronV4(pool.stakeToken).totalBorrow();
-                if (block.timestamp > pool.lastRewardTimestamp && lpSupply.base != 0) {
-                    uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
-                    uint256 reward = multiplier.mul(pool.rewardPerSecond);
-                    rewardPerShare = rewardPerShare.add(reward.mul(1e20).div(lpSupply.base));
-                }
-                return user.amount.mul(rewardPerShare).div(1e20).sub(user.rewardDebt);
+        uint256 lpSupply = 0;
+        if (pool.isInspire) {
+            Rebase memory lpSupplyRebase = ICauldronV4(pool.stakeToken).totalBorrow();
+            if (block.timestamp > pool.lastRewardTimestamp && lpSupplyRebase.base != 0) {
+                lpSupply = lpSupplyRebase.base;
             }
+        } else if (_pid == 0) {
+            uint256 rPerSencond = pool.rewardPerSecond;
+            uint256 epoch = block.timestamp;
+            uint256 userLockAmount = getLockAmount(_user);
+            if (epoch > pool.lastRewardTimestamp && userLockAmount != 0) {
+                uint256 lrt = pool.lastRewardTimestamp;
+                for (uint i = arvLastRelease; i < epoch; ) {
+                    i += 1 days;
+                    uint256 timestamp = Math.min(epoch, i);
+                    uint256 multiplier = getMultiplier(lrt, timestamp);
+                    uint256 reward = multiplier.mul(rPerSencond);
+                    if (timestamp < epoch) {
+                        rPerSencond = (rPerSencond * 999) / 1000;
+                    }
+                    rewardPerShare = rewardPerShare.add(reward.mul(1e20).div(totalVinLock));
+                    lrt = timestamp;
+                }
+            }
+            return userLockAmount.mul(rewardPerShare).div(1e20).sub(user.rewardDebt);
+        } else {
+            lpSupply = totalStake[_pid];
         }
+        if (lpSupply == 0) {
+            return 0;
+        }
+        uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
+        uint256 reward = multiplier.mul(pool.rewardPerSecond);
+        rewardPerShare = rewardPerShare.add(reward.mul(1e20).div(lpSupply));
+        return user.amount.mul(rewardPerShare).div(1e20).sub(user.rewardDebt);
     }
 
     function getLockInfo(address user) external view returns (LockDetail[] memory locks) {
@@ -245,10 +254,14 @@ contract MasterChef is Ownable, IMasterChef {
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        if (pool.isDynamicReward || block.timestamp <= pool.lastRewardTimestamp) {
+        if (block.timestamp <= pool.lastRewardTimestamp) {
             return;
         }
-        if (_pid == 0) {
+        uint256 lpSupply = 0;
+        if (pool.isInspire) {
+            Rebase memory lpSupplyRebase = ICauldronV4(pool.stakeToken).totalBorrow();
+            lpSupply = lpSupplyRebase.base;
+        } else if (_pid == 0) {
             uint256 epoch = block.timestamp;
             for (uint i = arvLastRelease; i < epoch; ) {
                 i += 1 days;
@@ -265,27 +278,17 @@ contract MasterChef is Ownable, IMasterChef {
                 }
                 pool.lastRewardTimestamp = timestamp;
             }
-        } else if (LP_POOL == _pid) {
-            uint256 lpSupply = totalStake[_pid];
-            if (lpSupply == 0) {
-                pool.lastRewardTimestamp = block.timestamp;
-                return;
-            }
-            uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
-            uint256 reward = multiplier.mul(pool.rewardPerSecond);
-            pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(lpSupply));
-            pool.lastRewardTimestamp = block.timestamp;
         } else {
-            Rebase memory lpSupply = ICauldronV4(pool.stakeToken).totalBorrow();
-            if (lpSupply.base == 0) {
-                pool.lastRewardTimestamp = block.timestamp;
-                return;
-            }
-            uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
-            uint256 reward = multiplier.mul(pool.rewardPerSecond);
-            pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(lpSupply.base));
-            pool.lastRewardTimestamp = block.timestamp;
+            uint256 lpSupply = totalStake[_pid];
         }
+        if (lpSupply == 0) {
+            pool.lastRewardTimestamp = block.timestamp;
+            return;
+        }
+        uint256 multiplier = getMultiplier(pool.lastRewardTimestamp, block.timestamp);
+        uint256 reward = multiplier.mul(pool.rewardPerSecond);
+        pool.rewardPerShare = pool.rewardPerShare.add(reward.mul(1e20).div(lpSupply));
+        pool.lastRewardTimestamp = block.timestamp;
     }
 
     function deposit(uint256 _pid, uint256 _amount) public {
@@ -310,16 +313,15 @@ contract MasterChef is Ownable, IMasterChef {
             }
         }
         userLockAmount += _amount;
-        userLock[msg.sender].push(LockDetail({lockAmount: _amount, unlockAmount: 0, unlockTimestamp: block.timestamp + 21 days}));
-
+        userLock[msg.sender].push(LockDetail({lockAmount: _amount, unlockAmount: 0, unlockTimestamp: block.timestamp + 16 weeks}));
         user.rewardDebt = userLockAmount.mul(pool.rewardPerShare).div(1e20);
         totalVinLock += _amount;
     }
 
     /// @notice Deposit tokens to MasterChef.
-    /// @param to can be address(0) if the pool is dynamic reward. otherwise please use the user address;
-    /// @param _pid can be 0 if the pool is non dynamic reward
-    /// @param _amount can be 0 if the pool is non dynamic reward
+    /// @param to can be address(0) if the pool is inspire reward. otherwise please use the user address;
+    /// @param _pid can be 0 if the pool is non inspire reward
+    /// @param _amount can be 0 if the pool is non inspire reward
     function _deposit(address to, uint256 _pid, uint256 _amount) private {
         if (_pid == 0) {
             _pid = cauldronPoolInfo[msg.sender];
@@ -327,26 +329,25 @@ contract MasterChef is Ownable, IMasterChef {
         if (_pid == 0) {
             return;
         }
-        require(_pid != 0, "deposit CAKE by staking");
         updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
-        if (pool.isDynamicReward || _pid == LP_POOL) {
+        if (!pool.isInspire) {
             to = msg.sender;
         } else {
-            require(msg.sender == pool.stakeToken, "only cauldron can deposit non dynamic pool");
+            require(msg.sender == pool.stakeToken, "only cauldron can deposit inspire pool");
         }
         UserInfo storage user = userInfo[_pid][to];
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             if (pending > 0) {
-                if (!pool.isDynamicReward && _pid != LP_POOL) {
+                if (pool.isInspire) {
                     userPendingReward[to] += pending;
                 } else {
                     IStrictERC20(pool.rewardToken).transfer(to, pending);
                 }
             }
         }
-        if (!pool.isDynamicReward && _pid != LP_POOL) {
+        if (pool.isInspire) {
             uint256 newAmount = ICauldronV4(pool.stakeToken).userBorrowPart(to);
             emit Deposit(msg.sender, _pid, newAmount - user.amount);
             user.amount = newAmount;
@@ -394,9 +395,9 @@ contract MasterChef is Ownable, IMasterChef {
     }
 
     /// @notice Withdraw tokens from MasterChef.
-    /// @param to can be address(0) if the pool is dynamic reward. otherwise please use the user address;
-    /// @param _pid can be 0 if the pool is non dynamic reward
-    /// @param _amount can be 0 if the pool is non dynamic reward
+    /// @param to can be address(0) if the pool is inspire reward. otherwise please use the user address;
+    /// @param _pid can be 0 if the pool is non inspire reward
+    /// @param _amount can be 0 if the pool is non inspire reward
     function _withdraw(address to, uint256 _pid, uint256 _amount, bool unlockVIN) private {
         if (_pid == 0) {
             _pid = cauldronPoolInfo[msg.sender];
@@ -404,25 +405,24 @@ contract MasterChef is Ownable, IMasterChef {
         if (_pid == 0) {
             return;
         }
-        require(_pid != 0, "withdraw CAKE by unstaking");
         updatePool(_pid);
         PoolInfo memory pool = poolInfo[_pid];
-        if (pool.isDynamicReward || _pid == LP_POOL) {
+        if (!pool.isInspire) {
             to = msg.sender;
         } else {
-            require(msg.sender == pool.stakeToken, "only cauldron can deposit non dynamic pool");
+            require(msg.sender == pool.stakeToken, "only cauldron can deposit inspire pool");
         }
         UserInfo storage user = userInfo[_pid][to];
         require(user.amount >= _amount, "withdraw: not good");
         uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
         if (pending > 0) {
-            if (!pool.isDynamicReward && _pid != LP_POOL) {
+            if (pool.isInspire) {
                 userPendingReward[to] += pending;
             } else {
                 IStrictERC20(pool.rewardToken).transfer(to, pending);
             }
         }
-        if (!pool.isDynamicReward && _pid != LP_POOL) {
+        if (pool.isInspire) {
             uint256 oldAmount = ICauldronV4(pool.stakeToken).userBorrowPart(to);
             emit Withdraw(to, _pid, user.amount - oldAmount);
             user.amount = oldAmount;
@@ -480,7 +480,7 @@ contract MasterChef is Ownable, IMasterChef {
             uint256 pending = user.amount.mul(pool.rewardPerShare).div(1e20).sub(user.rewardDebt);
             user.rewardDebt = user.amount.mul(pool.rewardPerShare).div(1e20);
             if (pending > 0) {
-                if (!pool.isDynamicReward && _pid != LP_POOL) {
+                if (pool.isInspire) {
                     userPendingReward[to] += pending;
                 } else {
                     IStrictERC20(pool.rewardToken).transfer(to, pending);
@@ -527,21 +527,20 @@ contract MasterChef is Ownable, IMasterChef {
     function emergencyWithdraw(uint256 _pid) public {
         require(_pid != 0, "can not emergency withdraw arv release pool");
         PoolInfo storage pool = poolInfo[_pid];
+        require(!pool.isInspire, "inspire pool can not withdraw");
         address operator = msg.sender;
         UserInfo storage user = userInfo[_pid][operator];
-        IStrictERC20(pool.stakeToken).transfer(operator, user.amount);
         if (_pid == 1) {
             uint256 userLockAmount = getLockAmount(operator);
             totalVinLock -= userLockAmount;
             delete userLock[operator];
             delete userUnlockIndex[operator];
         }
-        if (pool.isDynamicReward) {
-            totalStake[_pid] -= user.amount;
-        }
+        totalStake[_pid] -= user.amount;
         emit EmergencyWithdraw(operator, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+        IStrictERC20(pool.stakeToken).transfer(operator, user.amount);
     }
 
     function estimateARVCirculatingSupply() public view returns (uint256 circulatingSupply) {

@@ -5,18 +5,9 @@ import "forge-std/Script.sol";
 import "oracles/ProxyOracle.sol";
 import "utils/BaseScript.sol";
 import "utils/CauldronDeployLib.sol";
-import "periphery/CauldronOwner.sol";
-import "/ArvinDegenNFT.sol";
-import "/ARV.sol";
-import "/VIN.sol";
-import "/DegenBox.sol";
 import "/IN.sol";
 import "utils/OracleLib.sol";
-import "periphery/MasterChef.sol";
-import "./MarketLens.s.sol";
 import "interfaces/IWETH.sol";
-import "forge-std/Test.sol";
-import "oracles/Tricrypto2Oracle.sol";
 import "oracles/GlpOracle.sol";
 import "interfaces/IGmxRewardRouterV2.sol";
 import "interfaces/IGmxVault.sol";
@@ -25,7 +16,6 @@ import "swappers/GlpSwapper.sol";
 import "/cauldrons/CvxCauldron.sol";
 import "interfaces/IUniswapV2Router01.sol";
 import "interfaces/ICurvePool.sol";
-import "oracles/WbtcOracle.sol";
 
 contract ArvinDeployAllScript is BaseScript {
     ARV arv;
@@ -37,7 +27,7 @@ contract ArvinDeployAllScript is BaseScript {
     CauldronV4 cvxCauldronMC;
     IBentoBoxV1 degenBox;
     MasterChef mc;
-    IWETH weth;
+    IWETH weth = IWETH(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
     uint256 rewardTimestamp = block.timestamp;
     address sGlp;
     IGmxRewardRouterV2 rewardRouterV2;
@@ -68,27 +58,31 @@ contract ArvinDeployAllScript is BaseScript {
     }
 
     address cvx3crypto = 0xA9249f8667cb120F065D9dA1dCb37AD28E1E8FF0;
+    uint256 deployerKey;
+    uint256 userKey;
 
     function deploy() public {
-        startBroadcast();
+        deployerKey = vm.envUint("DEPLOYER_KEY");
+        userKey = vm.envUint("USER_KEY");
+        vm.startBroadcast(deployerKey);
         sGlp = constants.getAddress("arbitrum.gmx.sGLP");
         rewardRouterV2 = IGmxRewardRouterV2(constants.getAddress("arbitrum.gmx.rewardRouterV2"));
         glpManager = constants.getAddress("arbitrum.gmx.glpManager");
         console.log("## Cores");
         console.log("| Contract Name  | Address   | Description   |");
         console.log("| -------------- | --------- | ------------- |");
-        weth = IWETH(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
         degenBox = IBentoBoxV1(address(new DegenBox(IERC20(weth))));
-        nft = new ArvinDegenNFT("", msg.sender);
         arv = new ARV();
         vin = new VIN();
+        nft = new ArvinDegenNFT(address(vin), "https://bafybeia6zu4smgnhdxyye3bkbnj7urry3oemz4l5uimqms5i2pl7knaaqe.ipfs.dweb.link/");
         _in = new IN();
         logAddr(address(arv), "ARV");
         logAddr(address(vin), "VIN");
         logAddr(address(_in), "IN");
         logAddr(address(degenBox), "Degen Box");
         logAddr(address(nft), "Arvin Degen NFT");
-        mc = new MasterChef(address(arv), address(vin), address(_in), address(0), rewardTimestamp);
+        address treasury = 0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d;
+        mc = new MasterChef(address(arv), address(vin), address(_in), rewardTimestamp);
         logAddr(address(mc), "Master Chef");
 
         cauldronV4MC = new CauldronV4(degenBox, _in, address(mc), address(nft));
@@ -101,11 +95,11 @@ contract ArvinDeployAllScript is BaseScript {
         logAddr(address(cauldronV4MC), "Cauldron Master Contract");
         logAddr(address(gmxCauldronMC), "GMX Cauldron Master Contract");
         logAddr(address(cvxCauldronMC), "Convex Cauldron Master Contract");
-        cauldronV4MC.setFeeTo(msg.sender);
-        gmxCauldronMC.setFeeTo(msg.sender);
-        cvxCauldronMC.setFeeTo(msg.sender);
+        cauldronV4MC.setFeeTo(treasury);
+        gmxCauldronMC.setFeeTo(treasury);
+        cvxCauldronMC.setFeeTo(treasury);
 
-        _in.mint(msg.sender, 9500000 ether);
+        _in.mint(msg.sender, 7000000 ether);
 
         // _in.transfer(address(degenBox), 9500000 ether);
         _in.approve(address(degenBox), type(uint256).max);
@@ -140,8 +134,8 @@ contract ArvinDeployAllScript is BaseScript {
             500, // 5% interests
             0, // 0% opening
             500, // 5% liquidation
-            3000000,
-            170 * 1 ether,
+            1000000,
+            110 * 1 ether,
             rewardTimestamp,
             true,
             "Cauldron(sGLP)"
@@ -165,21 +159,21 @@ contract ArvinDeployAllScript is BaseScript {
         );
 
         //Cauldron(Tricrypto)
-        ProxyOracle triOracle = OracleLib.deploySimpleProxyOracle(new Tricrypto2Oracle(0x960ea3e3C7FB317332d990873d354E18d7645590));
+        // ProxyOracle triOracle = OracleLib.deploySimpleProxyOracle(new Tricrypto2Oracle(0x960ea3e3C7FB317332d990873d354E18d7645590));
 
-        address tricrypto = deployCauldronWithMasterContract(
-            address(triOracle),
-            cvx3crypto, //Tricrypto
-            8500, // 85% ltv
-            500, // 5% interests
-            50, // 0.5% opening
-            500, // 5% liquidation
-            500000,
-            20 * 1 ether,
-            rewardTimestamp,
-            address(cvxCauldronMC)
-        );
-        logAddr(tricrypto, "Cauldron(cvxcrv3crypto)");
+        // address tricrypto = deployCauldronWithMasterContract(
+        //     address(triOracle),
+        //     cvx3crypto, //Tricrypto
+        //     8500, // 85% ltv
+        //     500, // 5% interests
+        //     50, // 0.5% opening
+        //     500, // 5% liquidation
+        //     500000,
+        //     20 * 1 ether,
+        //     rewardTimestamp,
+        //     address(cvxCauldronMC)
+        // );
+        // logAddr(tricrypto, "Cauldron(cvxcrv3crypto)");
 
         //Cauldron(MAGIC)
         ProxyOracle magicOracle = OracleLib.deploySimpleInvertedOracle(
@@ -242,13 +236,19 @@ contract ArvinDeployAllScript is BaseScript {
         logAddr(address(ethOracle), "ETH/USD Oracle");
         logAddr(address(aglpOracle), "GLP Oracle");
         logAddr(address(arbOracle), "ARB/USD Oracle");
-        logAddr(address(triOracle), "tricrypto/USD Oracle");
+        // logAddr(address(triOracle), "tricrypto/USD Oracle");
         logAddr(address(magicOracle), "MAGIC/USD Oracle");
         logAddr(address(gmxOracle), "GMX/USD Oracle");
         logAddr(address(btcOracle), "BTC/USD Oracle");
         // MarketLensScript script = new MarketLensScript();
         depolyPeripheries();
-        // initToken();
+
+        vin.transfer(address(0xD3B6dCb49A69BF7f51A43605B0412c575aE07388), 3000000 ether); //LP
+        vin.transfer(address(0x4d607041BcD0c4544548B749E2b351D7587A30b1), 3500000 ether); //Community
+        vin.transfer(address(0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d), 2000000 ether); //Team
+        vin.transfer(address(0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d), 1500000 ether); //Treasury
+        arv.transfer(address(mc), 1e5 ether);
+        require(vin.balanceOf(msg.sender) == 0 && arv.balanceOf(msg.sender) == 0);
         stopBroadcast();
     }
 
@@ -261,57 +261,21 @@ contract ArvinDeployAllScript is BaseScript {
     address gmx = 0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a;
     address booster = 0xF403C135812408BFbE8713b5A23a04b3D48AAE31;
 
-    function initToken() private {
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(weth);
-        tokens[1] = usdt;
-        address to = 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199;
-        sushiRouter.swapExactETHForTokens{value: 1000 ether}(0, tokens, to, 9999999999999);
-        tokens[1] = wbtc;
-        sushiRouter.swapExactETHForTokens{value: 1000 ether}(0, tokens, to, 9999999999999);
-        tokens[1] = magic;
-        sushiRouter.swapExactETHForTokens{value: 1000 ether}(0, tokens, to, 9999999999999);
-        tokens[1] = arb;
-        sushiRouter.swapExactETHForTokens{value: 1000 ether}(0, tokens, to, 9999999999999);
-        tokens[1] = gmx;
-        sushiRouter.swapExactETHForTokens{value: 1000 ether}(0, tokens, to, 9999999999999);
-        IGmxGlpRewardRouter(0xB95DB5B167D75e6d04227CfFFA61069348d271F5).mintAndStakeGlpETH{value: 1000 ether}(0, 0);
-        IStrictERC20(sGlp).transfer(to, IERC20(sGlp).balanceOf(msg.sender));
-        uint256[3] memory sss;
-        sss[0] = 0;
-        sss[1] = 0;
-        sss[2] = 1000 ether;
-        tricryptoPool.add_liquidity{value: 1000 ether}(sss, 0);
-        IStrictERC20(0x8e0B8c8BB9db49a46697F3a5Bb8A308e744821D2).approve(
-            booster,
-            IERC20(0x8e0B8c8BB9db49a46697F3a5Bb8A308e744821D2).balanceOf(msg.sender)
-        );
-        bytes memory data = fromHex("c6f678bd0000000000000000000000000000000000000000000000000000000000000008");
-        (bool succeed, bytes memory res) = address(booster).call(data);
-        IStrictERC20(cvx3crypto).transfer(to, IERC20(cvx3crypto).balanceOf(msg.sender));
-    }
-
     function depolyPeripheries() private {
         address swapper = constants.getAddress("arbitrum.aggregators.zeroXExchangeProxy");
         IGmxVault _gmxVault = IGmxVault(constants.getAddress("arbitrum.gmx.vault"));
         console.log("## Swappers");
         console.log("| Contract Name  | Address   | Description   |");
         console.log("| -------------- | --------- | ------------- |");
-        GlpSwapper glpSwapper = new GlpSwapper(
-            degenBox,
-            _gmxVault,
-            _in,
-            IERC20(sGlp),
-            IGmxGlpRewardRouter(address(rewardRouterV2)),
-            swapper
-        );
+        address glpRewardRouter = constants.getAddress("arbitrum.gmx.glpRewardRouter");
+        GlpSwapper glpSwapper = new GlpSwapper(degenBox, _gmxVault, _in, IERC20(sGlp), IGmxGlpRewardRouter(glpRewardRouter), swapper);
         GlpLevSwapper glpLevSwapper = new GlpLevSwapper(
             degenBox,
             _gmxVault,
             _in,
             IERC20(sGlp),
             glpManager,
-            IGmxGlpRewardRouter(address(rewardRouterV2)),
+            IGmxGlpRewardRouter(glpRewardRouter),
             swapper
         );
         logAddrWithDesc(address(glpLevSwapper), "GLP Leverage Swapper", "IN -> Token");
@@ -352,7 +316,7 @@ contract ArvinDeployAllScript is BaseScript {
         limit *= 1 ether;
         cauldronV4.changeBorrowLimit(limit, limit);
         logAddr(address(cauldronV4), lable);
-        mc.add(rewardPerDay / 1 days / 4, address(cauldronV4), startTimestamp, true);
+        mc.addInspire(rewardPerDay / 1 days / 4, address(cauldronV4), startTimestamp, true);
         degenBox.deposit(_in, address(msg.sender), address(cauldronV4), limit, 0);
         return address(cauldronV4);
     }
@@ -413,7 +377,7 @@ contract ArvinDeployAllScript is BaseScript {
         );
         limit *= 1 ether;
         cauldronV4.changeBorrowLimit(limit, limit);
-        mc.add(rewardPerDay / 1 days / 4, address(cauldronV4), startTimestamp, true);
+        mc.addInspire(rewardPerDay / 1 days / 4, address(cauldronV4), startTimestamp, true);
         degenBox.deposit(_in, address(msg.sender), address(cauldronV4), limit, 0);
         return address(cauldronV4);
     }

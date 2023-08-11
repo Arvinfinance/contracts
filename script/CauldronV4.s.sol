@@ -28,14 +28,14 @@ contract CauldronV4Script is BaseScript {
             mim = ERC20(constants.getAddress("avalanche.mim"));
         }
         startBroadcast();
-        ArvinDegenNFT nft = new ArvinDegenNFT("", msg.sender);
         ARV arv = new ARV();
         VIN vin = new VIN();
+        ArvinDegenNFT nft = new ArvinDegenNFT(address(vin), "");
         IN _in = new IN();
 
-        MasterChef mc = new MasterChef(address(arv), address(vin), address(_in), address(0), block.timestamp);
-        CauldronOwner owner = new CauldronOwner(safe, mim);
-        CauldronV4 cauldronV4MC = new CauldronV4(degenBox, mim, address(mc), address(nft));
+        MasterChef mc = new MasterChef(address(arv), address(vin), address(_in), block.timestamp);
+        CauldronOwner owner = new CauldronOwner(safe, _in);
+        CauldronV4 cauldronV4MC = new CauldronV4(degenBox, _in, address(mc), address(nft));
 
         if (!testing) {
             owner.setOperator(safe, true);

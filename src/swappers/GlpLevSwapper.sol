@@ -73,7 +73,7 @@ contract GlpLevSwapper is ILevSwapperV2 {
 
         _amount = glpRewardRouter.mintAndStakeGlp(address(token), _amount, 0, 0);
 
-        (, shareReturned) = bentoBox.deposit(sGLP, address(bentoBox), recipient, _amount, 0);
+        (, shareReturned) = bentoBox.deposit(sGLP, address(this), recipient, _amount, 0);
 
         extraShare = shareReturned - shareToMin;
     }

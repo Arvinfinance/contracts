@@ -23,11 +23,11 @@ contract ArvinScript is BaseScript {
 
         IWETH weth = IWETH(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
         DegenBox degenBox = new DegenBox(IERC20(weth));
-        ArvinDegenNFT nft = new ArvinDegenNFT("", msg.sender);
         ARV arv = new ARV();
         VIN vin = new VIN();
+        ArvinDegenNFT nft = new ArvinDegenNFT(address(vin), "");
         IN _in = new IN();
-        MasterChef mc = new MasterChef(address(arv), address(vin), address(_in), address(0), block.timestamp);
+        MasterChef mc = new MasterChef(address(arv), address(vin), address(_in), block.timestamp);
         CauldronV4 cauldronV4MC = new CauldronV4(IBentoBoxV1(address(degenBox)), _in, address(mc), address(nft));
         cauldronV4MC.setFeeTo(msg.sender);
         ProxyOracle oracle = OracleLib.deploySimpleInvertedOracle("ETH/USD", IAggregator(0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612));
@@ -47,7 +47,7 @@ contract ArvinScript is BaseScript {
         _in.mint(msg.sender, 10000000 ether);
         _in.transfer(address(degenBox), 500000 ether);
         _in.approve(address(degenBox), type(uint256).max);
-        mc.add((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), block.timestamp, true);
+        mc.addInspire((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), block.timestamp, true);
         degenBox.deposit(_in, address(msg.sender), address(ethCauldronV4), 500000 ether, 0);
         stopBroadcast();
     }

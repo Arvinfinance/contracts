@@ -14,6 +14,19 @@ import "utils/BaseScript.sol";
 import "utils/OracleLib.sol";
 import "interfaces/IWETH.sol";
 
+interface Registery {
+    function get_address(uint256 _id) external view returns (address);
+}
+
+interface Swaps {
+    function get_best_rate(
+        address _from,
+        address _to,
+        uint256 _amount,
+        address[8] memory _exclude_pools
+    ) external view returns (address, uint256);
+}
+
 contract ArvinLogicTest is BaseTest {
     address treasury = address(0x999);
     ICauldronV4 ethCauldronV4;
@@ -33,11 +46,11 @@ contract ArvinLogicTest is BaseTest {
         pushPrank(deployer);
         weth = IWETH(constants.getAddress("mainnet.weth"));
         degenBox = new DegenBox(IERC20(weth));
-        nft = new ArvinDegenNFT("", msg.sender);
         arv = new ARV();
         vin = new VIN();
+        nft = new ArvinDegenNFT(address(vin), "");
         _in = new IN();
-        mc = new MasterChef(address(arv), address(vin), address(_in), address(0), block.timestamp);
+        mc = new MasterChef(address(arv), address(vin), address(_in), block.timestamp);
         cauldronV4MC = new CauldronV4(IBentoBoxV1(address(degenBox)), _in, address(mc), address(nft));
         cauldronV4MC.setFeeTo(deployer);
         ProxyOracle oracle = OracleLib.deploySimpleInvertedOracle("ETH/USD", IAggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419));
@@ -57,7 +70,7 @@ contract ArvinLogicTest is BaseTest {
         _in.mint(deployer, 10000000 ether);
         _in.transfer(address(degenBox), 500000 ether);
         _in.approve(address(degenBox), type(uint256).max);
-        mc.add((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), block.timestamp, true);
+        mc.addInspire((uint256(1096) * 1e17) / 1 days, address(ethCauldronV4), block.timestamp, true);
         degenBox.deposit(_in, address(deployer), address(ethCauldronV4), 500000 ether, 0);
     }
 
@@ -165,7 +178,6 @@ contract ArvinLogicTest is BaseTest {
         vm.warp(today + 40 * 1 days);
         mc.withdrawLock(100 ether);
         console.log(arv.balanceOf(alice));
-        console.log(mc.getUnlockableAmount(alice));
     }
 
     mapping(address => uint256[]) testMap;
