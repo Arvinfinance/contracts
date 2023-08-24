@@ -133,7 +133,7 @@ contract CauldronV4 is BoringOwnable, IMasterContract {
 
     uint256 internal constant DISTRIBUTION_PART = 10;
     uint256 internal constant DISTRIBUTION_PRECISION = 100;
-    uint256 internal constant FEE_DIV = 1000;
+    uint256 internal constant FEE_DIV = 1e12;
 
     function onlyMasterContractOwner() private view {
         if (msg.sender != masterContract.owner()) revert CallerIsNotTheOwner();

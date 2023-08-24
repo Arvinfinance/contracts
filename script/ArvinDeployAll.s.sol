@@ -243,13 +243,29 @@ contract ArvinDeployAllScript is BaseScript {
         // MarketLensScript script = new MarketLensScript();
         depolyPeripheries();
 
+        console.log("## Other");
+        console.log("| Contract Name  | Address   | Description   |");
+        console.log("| -------------- | --------- | ------------- |");
+        //Team vin lock
+        VINLocker locker = new VINLocker(address(vin));
+        uint256 teamLock = 2000000 ether;
+        vin.approve(address(locker), teamLock);
+        VINLocker.LockDetail[] memory locks = new VINLocker.LockDetail[](4);
+        locks[0] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 1 minutes});
+        locks[1] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 days});
+        locks[2] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 2 days});
+        locks[3] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 3 days});
+        locker.lock(locks, 0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d);
+
+        logAddr(address(locker), "VIN Locker");
+        //other vin
         vin.transfer(address(0xD3B6dCb49A69BF7f51A43605B0412c575aE07388), 3000000 ether); //LP
         vin.transfer(address(0x4d607041BcD0c4544548B749E2b351D7587A30b1), 3500000 ether); //Community
-        vin.transfer(address(0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d), 2000000 ether); //Team
         vin.transfer(address(0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d), 1500000 ether); //Treasury
         arv.transfer(address(mc), 1e5 ether);
         require(vin.balanceOf(msg.sender) == 0 && arv.balanceOf(msg.sender) == 0);
         stopBroadcast();
+        console.log(jsStr);
     }
 
     IUniswapV2Router01 sushiRouter = IUniswapV2Router01(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
@@ -286,8 +302,6 @@ contract ArvinDeployAllScript is BaseScript {
         console.log("| -------------- | --------- | ------------- |");
         logAddr(address(new MarketLens()), "Market Lens");
         logAddr(address(new GmxLens(IGmxGlpManager(glpManager), _gmxVault)), "Gmx Lens");
-
-        console.log(jsStr);
     }
 
     function deployGmxCauldron(

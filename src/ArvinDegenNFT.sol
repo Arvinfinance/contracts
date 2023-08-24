@@ -15,9 +15,9 @@ contract ArvinDegenNFT is ERC721Enumerable, BoringOwnable, IArvinDegenNFT {
     string public uri;
     using Strings for uint256;
     IStrictERC20 vin;
-    uint256 mintNeed = 19 ether;
+    uint256 public mintNeed = 19 ether;
     uint256 increaseAmount = 0.18 ether;
-    uint256 left = 1000;
+    uint256 public left = 1000;
     uint256[1000] mintLeft;
 
     constructor(address _vin, string memory _uri) ERC721("Arvin Degen NFT", "ADNFT") {
