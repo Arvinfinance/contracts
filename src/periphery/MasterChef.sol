@@ -55,7 +55,6 @@ contract MasterChef is Ownable, IMasterChef {
     uint256 public constant LOCK_POOL = 0;
     uint256 public constant VIN_POOL = 1;
     uint256 public constant ARV_POOL = 2;
-    uint256 public constant LP_POOL = 3;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -491,7 +490,7 @@ contract MasterChef is Ownable, IMasterChef {
 
     function vestingPendingReward(bool claim) public {
         if (claim) {
-            for (uint256 i = 4; i < poolInfo.length; i++) {
+            for (uint256 i = 3; i < poolInfo.length; i++) {
                 claimPending(i);
             }
         }
@@ -501,7 +500,7 @@ contract MasterChef is Ownable, IMasterChef {
         userPendingReward[msg.sender] = 0;
     }
 
-    function getUserVestingInfo(address user) external returns (VestingInfo[] memory) {
+    function getUserVestingInfo(address user) external view returns (VestingInfo[] memory) {
         return userVestingInfo[user];
     }
 

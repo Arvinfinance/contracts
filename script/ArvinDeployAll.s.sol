@@ -113,7 +113,7 @@ contract ArvinDeployAllScript is BaseScript {
             deployCauldron(
                 address(ethOracle),
                 address(weth), //WETH
-                8500, // 85% ltv
+                9000, // 85% ltv
                 350, // 3.5% interests
                 50, // 0.5% opening
                 750, // 7.5% liquidation
@@ -219,7 +219,7 @@ contract ArvinDeployAllScript is BaseScript {
             deployCauldron(
                 address(btcOracle),
                 wbtc, //BTC
-                8500, // 85% ltv
+                9000, // 85% ltv
                 350, // 3.5% interests
                 50, // 0.5% opening
                 750, // 7.5% liquidation
@@ -251,7 +251,7 @@ contract ArvinDeployAllScript is BaseScript {
         uint256 teamLock = 2000000 ether;
         vin.approve(address(locker), teamLock);
         VINLocker.LockDetail[] memory locks = new VINLocker.LockDetail[](4);
-        locks[0] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 1 minutes});
+        locks[0] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 30 minutes});
         locks[1] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 days});
         locks[2] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 2 days});
         locks[3] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 3 days});

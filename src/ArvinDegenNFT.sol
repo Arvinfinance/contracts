@@ -36,10 +36,6 @@ contract ArvinDegenNFT is ERC721Enumerable, BoringOwnable, IArvinDegenNFT {
         return tokenId;
     }
 
-    function getRandom(uint256 seed) private returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(block.timestamp, block.coinbase, gasleft(), msg.sender, seed))) % left;
-    }
-
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         string memory imgUrl = super.tokenURI(tokenId);
         string memory rate = _getRatioByTokenId(tokenId).toString();
@@ -53,6 +49,10 @@ contract ArvinDegenNFT is ERC721Enumerable, BoringOwnable, IArvinDegenNFT {
             );
     }
 
+    function getRandom(uint256 seed) private returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(block.timestamp, block.coinbase, gasleft(), msg.sender, seed))) % left;
+    }
+
     function _baseURI() internal view virtual override returns (string memory) {
         return uri;
     }
@@ -61,7 +61,7 @@ contract ArvinDegenNFT is ERC721Enumerable, BoringOwnable, IArvinDegenNFT {
         if (tokenId < 650) {
             rate += 2;
         } else if (tokenId < 850) {
-            rate += 2;
+            rate += 5;
         } else if (tokenId < 950) {
             rate += 10;
         } else if (tokenId < 1000) {
