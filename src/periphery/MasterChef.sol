@@ -278,7 +278,7 @@ contract MasterChef is Ownable, IMasterChef {
                 pool.lastRewardTimestamp = timestamp;
             }
         } else {
-            uint256 lpSupply = totalStake[_pid];
+            lpSupply = totalStake[_pid];
         }
         if (lpSupply == 0) {
             pool.lastRewardTimestamp = block.timestamp;
