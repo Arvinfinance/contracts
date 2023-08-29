@@ -28,7 +28,7 @@ contract ArvinDeployAllScript is BaseScript {
     IBentoBoxV1 degenBox;
     MasterChef mc;
     IWETH weth = IWETH(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
-    uint256 rewardTimestamp = block.timestamp;
+    uint256 rewardTimestamp = 1693303200;
     address sGlp;
     IGmxRewardRouterV2 rewardRouterV2;
     address glpManager;
@@ -113,7 +113,7 @@ contract ArvinDeployAllScript is BaseScript {
             deployCauldron(
                 address(ethOracle),
                 address(weth), //WETH
-                9000, // 85% ltv
+                9000, // 90% ltv
                 350, // 3.5% interests
                 50, // 0.5% opening
                 750, // 7.5% liquidation
@@ -219,7 +219,7 @@ contract ArvinDeployAllScript is BaseScript {
             deployCauldron(
                 address(btcOracle),
                 wbtc, //BTC
-                9000, // 85% ltv
+                9000, // 90% ltv
                 350, // 3.5% interests
                 50, // 0.5% opening
                 750, // 7.5% liquidation
@@ -255,13 +255,13 @@ contract ArvinDeployAllScript is BaseScript {
         locks[1] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 days});
         locks[2] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 2 days});
         locks[3] = VINLocker.LockDetail({amount: teamLock / 4, releaseTime: block.timestamp + 365 * 3 days});
-        locker.lock(locks, 0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d);
+        locker.lock(locks, treasury);
 
         logAddr(address(locker), "VIN Locker");
         //other vin
         vin.transfer(address(0xD3B6dCb49A69BF7f51A43605B0412c575aE07388), 3000000 ether); //LP
         vin.transfer(address(0x4d607041BcD0c4544548B749E2b351D7587A30b1), 3500000 ether); //Community
-        vin.transfer(address(0x3AecbC75C36a565Fc0014CF13F4feB0bcd71899d), 1500000 ether); //Treasury
+        vin.transfer(address(treasury), 1500000 ether); //Treasury
         arv.transfer(address(mc), 1e5 ether);
         require(vin.balanceOf(msg.sender) == 0 && arv.balanceOf(msg.sender) == 0);
         stopBroadcast();

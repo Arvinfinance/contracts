@@ -491,7 +491,10 @@ contract MasterChef is Ownable, IMasterChef {
     function vestingPendingReward(bool claim) public {
         if (claim) {
             for (uint256 i = 3; i < poolInfo.length; i++) {
-                claimPending(i);
+                PoolInfo memory pool = poolInfo[i];
+                if (pool.isInspire) {
+                    claimPending(i);
+                }
             }
         }
         userVestingInfo[msg.sender].push(
