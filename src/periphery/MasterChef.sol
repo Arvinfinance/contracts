@@ -540,9 +540,9 @@ contract MasterChef is Ownable, IMasterChef {
         }
         totalStake[_pid] -= user.amount;
         emit EmergencyWithdraw(operator, _pid, user.amount);
+        IStrictERC20(pool.stakeToken).transfer(operator, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
-        IStrictERC20(pool.stakeToken).transfer(operator, user.amount);
     }
 
     function estimateARVCirculatingSupply() public view returns (uint256 circulatingSupply) {
