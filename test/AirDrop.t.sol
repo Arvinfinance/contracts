@@ -6,7 +6,7 @@ import "OpenZeppelin/token/ERC20/presets/ERC20PresetFixedSupply.sol";
 contract AirDropTest is BaseTest {
     function testAirDrop() public {
         ERC20PresetFixedSupply vin = new ERC20PresetFixedSupply("test", "test", 100000 ether, address(this));
-        AirDrop ad = new AirDrop(0x88f5734e205cb6f4c68a76c6fc1a3cd4813935c6efec3ead602df262fea4671c, 200 ether, address(vin));
+        AirDrop ad = new AirDrop(0x88f5734e205cb6f4c68a76c6fc1a3cd4813935c6efec3ead602df262fea4671c, 200 ether, address(vin), 1696118400);
         vin.transfer(address(ad), 10000 ether);
         vm.prank(0x8A473EFb809B1C9eA7A4DD5cDD498e1fAC54Da14);
         bytes32[] memory proofs = new bytes32[](11);
